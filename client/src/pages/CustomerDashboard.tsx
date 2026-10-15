@@ -15,7 +15,9 @@ export const CustomerDashboard: React.FC = () => {
   const customerBookings = bookings.filter(b => b.customerId === currentUser?.id || true);
   const activeBookings = customerBookings.filter(b => b.status !== 'COMPLETED' && b.status !== 'CANCELLED');
   const completedBookings = customerBookings.filter(b => b.status === 'COMPLETED');
-  const favProviders = providers.filter(p => favorites.includes(p.id));
+  const favProviders = providers.filter(p => favorites.includes(p.id)
+    && p.verificationStatus === 'VERIFIED'
+    && !p.isDemo);
 
   const filteredBookings = customerBookings.filter(b => {
     if (bookingFilter === 'ACTIVE') return b.status !== 'COMPLETED' && b.status !== 'CANCELLED';

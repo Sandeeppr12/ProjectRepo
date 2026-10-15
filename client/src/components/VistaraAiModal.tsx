@@ -54,7 +54,8 @@ export const VistaraAiModal: React.FC = () => {
     // Parse Intent
     const parsed = parseNaturalLanguageQuery(textToSend);
     const targetCity = parsed.city || currentCity;
-    const ranked = rankProvidersWithAI(providers, parsed.category, parsed.service, targetCity);
+    const approvedProviders = providers.filter((provider) => provider.verificationStatus === 'VERIFIED' && !provider.isDemo);
+    const ranked = rankProvidersWithAI(approvedProviders, parsed.category, parsed.service, targetCity);
     const topMatches = ranked.slice(0, 2);
 
     setTimeout(() => {

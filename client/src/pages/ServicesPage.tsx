@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   GraduationCap, Activity, Code, Wrench, PartyPopper, 
@@ -29,8 +29,26 @@ export const ServicesPage: React.FC = () => {
   }, [categorySlug]);
 
   const activeCategory = categories.find(c => c.slug === activeCategorySlug) || categories[0];
+  const marketplaceProviders = useMemo(
+    () => providers.filter((provider) => provider.verificationStatus === 'VERIFIED' && !provider.isDemo),
+    [providers]
+  );
+  if (!activeCategory) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Services are being set up</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          The service catalog is temporarily unavailable. Please try again shortly.
+        </p>
+        <Link to="/" className="inline-flex mt-6 text-sm font-semibold text-blue-700 hover:text-blue-800">
+          Return to home
+        </Link>
+      </div>
+    );
+  }
+
   const categoryServices = services.filter(s => s.categoryName.toUpperCase() === activeCategory.name.toUpperCase());
-  const categoryProviders = providers.filter(p => p.category.toUpperCase() === activeCategory.name.toUpperCase());
+  const categoryProviders = marketplaceProviders.filter(p => p.category.toUpperCase() === activeCategory.name.toUpperCase());
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -44,7 +62,7 @@ export const ServicesPage: React.FC = () => {
           Services Catalog
         </h1>
         <p className="text-sm text-slate-600">
-          Browse specialized services across our 5 primary sectors and connect directly with verified experts.
+          Browse specialized services across our 5 primary sectors and explore professional listings.
         </p>
       </div>
 
@@ -86,7 +104,7 @@ export const ServicesPage: React.FC = () => {
           <div className="pt-2 flex items-center space-x-4 text-xs font-medium text-slate-300">
             <span>✓ {categoryServices.length} Services Listed</span>
             <span>•</span>
-            <span>✓ {categoryProviders.length} Verified Professionals Available</span>
+            <span>✓ {categoryProviders.length} Professionals Listed</span>
           </div>
         </div>
       </div>
@@ -154,7 +172,7 @@ export const ServicesPage: React.FC = () => {
                   to={`/providers?category=${encodeURIComponent(activeCategory.name)}&service=${encodeURIComponent(srv.name)}`}
                   className="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow"
                 >
-                  <span>Find {srv.name} Experts</span>
+                  <span>Choose an expert &amp; book</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -166,7 +184,7 @@ export const ServicesPage: React.FC = () => {
       {/* Featured Professionals in this Category */}
       <div className="space-y-6 pt-6 border-t border-slate-200">
         <h3 className="text-xl font-bold text-slate-900">
-          Top Verified Professionals in {activeCategory.name}
+          Professionals Listed in {activeCategory.name}
         </h3>
 
         {categoryProviders.length === 0 ? (

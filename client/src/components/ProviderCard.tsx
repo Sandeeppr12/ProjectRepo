@@ -11,9 +11,10 @@ import { UserAvatar } from './UserAvatar';
 interface ProviderCardProps {
   provider: Provider;
   recommendation?: AIRecommendationReason;
+  selectedService?: string;
 }
 
-export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, recommendation }) => {
+export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, recommendation, selectedService = '' }) => {
   const navigate = useNavigate();
   const { favorites, toggleFavorite } = useApp();
   const isFav = favorites.includes(provider.id);
@@ -50,7 +51,12 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, recommenda
               </p>
 
               {/* Rating & Reviews */}
-              <div className="flex items-center space-x-2 mt-1.5 text-xs">
+              {provider.isDemo ? (
+                <p className="mt-1.5 text-[11px] font-semibold text-amber-800">
+                      Fictional sample · Not verified or available for hire
+                </p>
+              ) : (
+                <div className="flex items-center space-x-2 mt-1.5 text-xs">
                 <div className="flex items-center text-amber-500 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 mr-1" />
                   <span>{provider.rating.toFixed(1)}</span>
@@ -58,16 +64,19 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, recommenda
                 <span className="text-slate-400">({provider.reviewCount} reviews)</span>
                 <span className="text-slate-300">•</span>
                 <span className="text-slate-600 font-medium">{provider.completedJobs}+ jobs</span>
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <button
-            onClick={() => toggleFavorite(provider.id)}
-            className={`p-2 rounded-xl transition ${isFav ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-400 hover:text-rose-500'}`}
-          >
-            <Heart className={`w-4 h-4 ${isFav ? 'fill-rose-500' : ''}`} />
-          </button>
+          {!provider.isDemo && (
+            <button
+              onClick={() => toggleFavorite(provider.id)}
+              className={`p-2 rounded-xl transition ${isFav ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-400 hover:text-rose-500'}`}
+            >
+              <Heart className={`w-4 h-4 ${isFav ? 'fill-rose-500' : ''}`} />
+            </button>
+          )}
         </div>
 
         {/* AI Recommendation Reason Badges */}
@@ -126,18 +135,33 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, recommenda
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-2 mt-5 pt-3 border-t border-slate-100">
         <Link
-          to={`/provider/${provider.id}`}
+          to={`/provider/${provider.id}${selectedService ? `?service=${encodeURIComponent(selectedService)}` : ''}`}
           className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs text-center transition"
         >
           View Profile
         </Link>
-        <button
-          onClick={() => navigate(`/book/${provider.id}`)}
-          className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2 px-3 rounded-xl text-xs text-center shadow transition flex items-center justify-center space-x-1"
-        >
-          <span>Book Service</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        {provider.isDemo ? (
+          <Link
+            to={`/contact?${new URLSearchParams({
+              request: 'professional',
+              service: selectedService || provider.servicesOffered[0] || '',
+              profile: provider.name
+            }).toString()}`}
+            className="group flex w-full items-center justify-center gap-1 rounded-xl border-2 border-emerald-800 bg-emerald-800 px-3 py-2 text-center text-xs font-bold !text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-900 hover:bg-emerald-900 hover:shadow-lg active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300"
+            style={{ color: '#fff' }}
+          >
+            <span>Request Booking</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
+          </Link>
+        ) : (
+          <button
+            onClick={() => navigate(`/book/${provider.id}?service=${encodeURIComponent(selectedService)}`)}
+            className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2 px-3 rounded-xl text-xs text-center shadow transition flex items-center justify-center space-x-1"
+          >
+            <span>Book Service</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
     </div>

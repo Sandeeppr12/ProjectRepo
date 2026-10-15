@@ -61,6 +61,7 @@ export interface ProviderPortfolioItem {
 
 export interface Provider {
   id: string;
+  isDemo?: boolean;
   userId: string;
   name: string;
   email: string;

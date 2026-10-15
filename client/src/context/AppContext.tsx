@@ -4,7 +4,7 @@ import {
   SystemNotification, Message, BookingStatus, ComplaintStatus 
 } from '../types';
 import { 
-  MOCK_PROVIDERS, MOCK_CATEGORIES, MOCK_SERVICES, 
+  MOCK_CATEGORIES, MOCK_SERVICES,
   MOCK_BOOKINGS, MOCK_REVIEWS, MOCK_COMPLAINTS, MOCK_NOTIFICATIONS, 
   MOCK_MESSAGES 
 } from '../data/mockData';
@@ -55,6 +55,8 @@ interface AppContextType {
     password: string;
     city: string;
     categoryId: string;
+    categoryName: string;
+    avatar?: string;
     servicesOffered: string[];
     qualification: string;
     experienceYears: number;
@@ -77,7 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentCity, setCurrentCity] = useState<string>('Jaipur');
   const [categories, setCategories] = useState<ServiceCategory[]>(MOCK_CATEGORIES);
   const [services, setServices] = useState<Service[]>(MOCK_SERVICES);
-  const [providers, setProviders] = useState<Provider[]>(MOCK_PROVIDERS);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [bookings, setBookings] = useState<Booking[]>(MOCK_BOOKINGS);
   const [reviews, setReviews] = useState<Review[]>(MOCK_REVIEWS);
   const [complaints, setComplaints] = useState<Complaint[]>(MOCK_COMPLAINTS);
@@ -122,8 +124,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const catalog = await apiRequest<{ categories: ServiceCategory[]; services: Service[]; providers: Provider[]; reviews: Review[] }>('/api/catalog');
         if (cancelled) return;
-        setCategories(catalog.categories);
-        setServices(catalog.services);
+        setCategories(catalog.categories.length ? catalog.categories : MOCK_CATEGORIES);
+        setServices(catalog.services.length ? catalog.services : MOCK_SERVICES);
         setProviders(catalog.providers);
         setReviews(catalog.reviews);
 

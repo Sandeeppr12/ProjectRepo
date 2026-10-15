@@ -750,10 +750,76 @@ app.get('/api/admin/records', requireAuth, requireRole('admin'), async (req, res
   }
 });
 
+app.post('/api/professional-requests', async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'Request service is unavailable because the database is not connected.' });
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  const service = typeof req.body?.service === 'string' ? req.body.service.trim() : '';
+  const profileName = typeof req.body?.profileName === 'string' ? req.body.profileName.trim() : '';
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+
+  if (name.length < 2 || name.length > 100 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 254
+      || phone.length > 30 || !service || service.length > 120 || profileName.length > 120
+      || message.length > 2000) {
+    return res.status(400).json({ error: 'Provide a valid name, email, service, and request message.' });
+  }
+
+  try {
+    const ref = db.collection('professionalRequests').doc();
+    const request = {
+      id: ref.id,
+      name,
+      email,
+      phone,
+      service,
+      profileName,
+      message,
+      status: 'NEW',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await ref.set(request);
+    res.status(201).json(request);
+  } catch (error) {
+    console.error('Professional request creation failed:', error.message);
+    res.status(500).json({ error: 'Could not save your professional request.' });
+  }
+});
+
+app.get('/api/admin/professional-requests', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const requests = await listCollection('professionalRequests');
+    requests.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    res.json({ requests });
+  } catch (error) {
+    console.error('Professional requests load failed:', error.message);
+    res.status(500).json({ error: 'Could not load professional requests.' });
+  }
+});
+
+app.patch('/api/admin/professional-requests/:id', requireAuth, requireRole('admin'), async (req, res) => {
+  const status = req.body?.status;
+  if (!['APPROVED', 'REJECTED'].includes(status)) {
+    return res.status(400).json({ error: 'Choose APPROVED or REJECTED for this request.' });
+  }
+  try {
+    const ref = db.collection('professionalRequests').doc(req.params.id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: 'Professional request not found.' });
+    const updatedAt = new Date().toISOString();
+    await ref.update({ status, updatedAt });
+    res.json({ ...documentData(snapshot), status, updatedAt });
+  } catch (error) {
+    console.error('Professional request update failed:', error.message);
+    res.status(500).json({ error: 'Could not update this professional request.' });
+  }
+});
+
 app.post('/api/admin/providers', requireAuth, requireRole('admin'), async (req, res) => {
   const {
     name, email, mobile, password, city, categoryId, servicesOffered,
-    qualification, experienceYears, startingPrice, serviceArea, bio
+    categoryName, qualification, experienceYears, startingPrice, serviceArea, bio, avatar
   } = req.body || {};
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   const normalizedName = typeof name === 'string' ? name.trim() : '';
@@ -768,7 +834,9 @@ app.post('/api/admin/providers', requireAuth, requireRole('admin'), async (req, 
       || !Number.isFinite(years) || years < 0 || years > 80
       || !Number.isFinite(price) || price <= 0
       || !Array.isArray(servicesOffered) || servicesOffered.length === 0
-      || typeof categoryId !== 'string') {
+      || servicesOffered.length > 20 || servicesOffered.some((service) => typeof service !== 'string' || !service.trim() || service.length > 120)
+      || typeof categoryId !== 'string'
+      || (avatar !== undefined && (typeof avatar !== 'string' || avatar.length > 2048))) {
     return res.status(400).json({ error: 'Provide valid provider details, a password of at least 12 characters, a category, services, experience, and a starting price.' });
   }
   if (ADMIN_EMAIL && normalizedEmail === ADMIN_EMAIL) {
@@ -780,14 +848,20 @@ app.post('/api/admin/providers', requireAuth, requireRole('admin'), async (req, 
       db.collection('categories').doc(categoryId).get(),
       listCollection('services')
     ]);
-    if (!categorySnapshot.exists) return res.status(400).json({ error: 'Choose an existing category.' });
-    const category = documentData(categorySnapshot);
+    if (!categorySnapshot.exists && (typeof categoryName !== 'string' || !categoryName.trim())) {
+      return res.status(400).json({ error: 'Choose an existing category.' });
+    }
+    const category = categorySnapshot.exists
+      ? documentData(categorySnapshot)
+      : { id: categoryId, name: categoryName.trim() };
     const selectedServices = [...new Set(servicesOffered.filter((service) => typeof service === 'string'))];
     const availableServices = new Set(
       matchingServices.filter((service) => service.categoryId === categoryId).map((service) => service.name)
     );
+    const hasPersistedCategoryServices = matchingServices.some((service) => service.categoryId === categoryId);
     if (selectedServices.length !== servicesOffered.length
-        || selectedServices.some((service) => !availableServices.has(service))) {
+        || (categorySnapshot.exists && hasPersistedCategoryServices
+          && selectedServices.some((service) => !availableServices.has(service)))) {
       return res.status(400).json({ error: 'Choose services that belong to the selected category.' });
     }
 
@@ -803,7 +877,7 @@ app.post('/api/admin/providers', requireAuth, requireRole('admin'), async (req, 
       mobile: normalizedMobile,
       role: 'provider',
       city: normalizedCity,
-      avatar: '',
+      avatar: typeof avatar === 'string' ? avatar.trim() : '',
       favorites: [],
       createdAt: now,
       passwordHash: await bcrypt.hash(password, 12)
@@ -814,7 +888,7 @@ app.post('/api/admin/providers', requireAuth, requireRole('admin'), async (req, 
       name: normalizedName,
       email: normalizedEmail,
       mobile: normalizedMobile,
-      avatar: '',
+      avatar: typeof avatar === 'string' ? avatar.trim() : '',
       category: category.name,
       servicesOffered: selectedServices,
       skills: selectedServices,
@@ -876,6 +950,9 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
     const providerSnapshot = await db.collection('providers').doc(providerId).get();
     if (!providerSnapshot.exists) return res.status(404).json({ error: 'Professional not found.' });
     const provider = documentData(providerSnapshot);
+    if (provider.verificationStatus !== 'VERIFIED') {
+      return res.status(403).json({ error: 'This professional must be approved before bookings can be made.' });
+    }
     if (!provider.servicesOffered.includes(serviceName) || !provider.startingPrice) {
       return res.status(400).json({ error: 'This service is not currently bookable.' });
     }
@@ -1141,6 +1218,15 @@ app.patch('/api/providers/:id', requireAuth, async (req, res) => {
       updates.verificationStatus = req.body.verificationStatus;
     }
     if (!Object.keys(updates).length) return res.status(400).json({ error: 'No editable profile fields were provided.' });
+    if (updates.verificationStatus === 'VERIFIED') {
+      const effectiveServices = updates.servicesOffered ?? provider.servicesOffered;
+      const effectivePrice = Number(updates.startingPrice ?? provider.startingPrice);
+      if (!Array.isArray(effectiveServices) || effectiveServices.length === 0
+          || effectiveServices.some((service) => typeof service !== 'string' || !service.trim())
+          || !Number.isFinite(effectivePrice) || effectivePrice <= 0) {
+        return res.status(400).json({ error: 'Assign at least one service and set a valid starting rate before approval.' });
+      }
+    }
     await ref.update(updates);
     res.json({ ...provider, ...updates });
   } catch (error) {
@@ -1286,6 +1372,9 @@ app.post('/api/payments/orders', ...(isFirebaseConfigured ? [requireAuth] : []),
       const providerSnapshot = await db.collection('providers').doc(providerId).get();
       if (providerSnapshot.exists) {
         const providerData = providerSnapshot.data();
+        if (providerData.verificationStatus !== 'VERIFIED') {
+          return res.status(403).json({ error: 'This professional must be approved before checkout.' });
+        }
         provider = { price: Number(providerData.startingPrice), services: providerData.servicesOffered || [] };
       }
     } else if (Object.prototype.hasOwnProperty.call(PAYMENT_CATALOG, providerId)) {

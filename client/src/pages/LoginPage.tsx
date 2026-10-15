@@ -11,6 +11,10 @@ export const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { setCurrentUser, isFirebaseConnected } = useApp();
   const isAdminLogin = searchParams.get('role') === 'admin';
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo = requestedReturnTo?.startsWith('/') && !requestedReturnTo.startsWith('//')
+    ? requestedReturnTo
+    : null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,7 +45,9 @@ export const LoginPage: React.FC = () => {
       }
       setAuthToken(result.token);
       setCurrentUser(result.user);
-      navigate(result.user.role === 'admin' ? '/admin/dashboard' : result.user.role === 'provider' ? '/provider/dashboard' : '/customer/dashboard');
+      navigate(result.user.role === 'customer' && returnTo
+        ? returnTo
+        : result.user.role === 'admin' ? '/admin/dashboard' : result.user.role === 'provider' ? '/provider/dashboard' : '/customer/dashboard');
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Could not sign in. Please try again.');
     } finally {
@@ -60,7 +66,7 @@ export const LoginPage: React.FC = () => {
         <div className="auth-form-footer">
           {isAdminLogin
             ? <>Not an administrator? <Link to="/login">Go to regular sign in</Link></>
-            : <>New to Digital Vistara? <Link to="/register">Create an account</Link></>}
+            : <>New to Digital Vistara? <Link to={returnTo ? `/register?returnTo=${encodeURIComponent(returnTo)}` : '/register'}>Create an account</Link></>}
         </div>
       )}
     >

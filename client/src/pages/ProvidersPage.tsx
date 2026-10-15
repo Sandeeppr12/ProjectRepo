@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Search, MapPin, Filter, Sparkles, CheckCircle2, SlidersHorizontal, 
   Star, Shield, Briefcase, RefreshCw, X 
@@ -8,23 +8,23 @@ import { useApp } from '../context/AppContext';
 import { ProviderCard } from '../components/ProviderCard';
 import { rankProvidersWithAI } from '../utils/aiRecommendationEngine';
 import { parseNaturalLanguageQuery } from '../utils/nlpParser';
-import { INDIAN_CITIES } from '../data/mockData';
 
 export const ProvidersPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { providers, categories, currentCity, setCurrentCity, setIsAiModalOpen } = useApp();
+  const { providers, categories, setIsAiModalOpen } = useApp();
+  const marketplaceProviders = useMemo(
+    () => providers.filter((provider) => provider.verificationStatus === 'VERIFIED' && !provider.isDemo),
+    [providers]
+  );
 
   const queryQ = searchParams.get('q') || '';
   const initialCategory = searchParams.get('category') || '';
   const initialService = searchParams.get('service') || '';
-  const initialCity = searchParams.get('city') || currentCity;
-
   const [searchQuery, setSearchQuery] = useState(queryQ);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedService, setSelectedService] = useState(initialService);
-  const [selectedCity, setSelectedCity] = useState(initialCity);
-  const [maxBudget, setMaxBudget] = useState<number>(10000);
-  const [minRating, setMinRating] = useState<number>(4.0);
+  const [maxBudget, setMaxBudget] = useState<number>(100000);
+  const [minRating, setMinRating] = useState<number>(0);
   const [verifiedOnly, setVerifiedOnly] = useState<boolean>(false);
   const [availableTodayOnly, setAvailableTodayOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<'recommended' | 'rating' | 'price_low' | 'price_high' | 'experience'>('recommended');
@@ -42,12 +42,18 @@ export const ProvidersPage: React.FC = () => {
   const rankedResults = useMemo(() => {
     const catToUse = selectedCategory || parsed?.category || '';
     const srvToUse = selectedService || parsed?.service || '';
-    const cityToUse = selectedCity || parsed?.city || currentCity;
 
-    let ranked = rankProvidersWithAI(providers, catToUse, srvToUse, cityToUse, maxBudget, availableTodayOnly);
+    let ranked = rankProvidersWithAI(marketplaceProviders, catToUse, srvToUse, '', maxBudget, availableTodayOnly);
 
     // Apply manual filters
     ranked = ranked.filter(({ provider }) => {
+      if (catToUse && !provider.category.toLowerCase().includes(catToUse.toLowerCase())) return false;
+      if (srvToUse) {
+        const serviceQuery = srvToUse.toLowerCase();
+        const offersService = [...provider.servicesOffered, ...provider.skills]
+          .some((service) => service.toLowerCase().includes(serviceQuery));
+        if (!offersService) return false;
+      }
       if (verifiedOnly && provider.verificationStatus !== 'VERIFIED') return false;
       if (provider.rating < minRating) return false;
       if (maxBudget && provider.startingPrice > maxBudget) return false;
@@ -66,15 +72,14 @@ export const ProvidersPage: React.FC = () => {
     }
 
     return ranked;
-  }, [providers, selectedCategory, selectedService, selectedCity, maxBudget, minRating, verifiedOnly, availableTodayOnly, sortBy, parsed, currentCity]);
+  }, [marketplaceProviders, selectedCategory, selectedService, maxBudget, minRating, verifiedOnly, availableTodayOnly, sortBy, parsed]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedService('');
-    setSelectedCity(currentCity);
-    setMaxBudget(10000);
-    setMinRating(4.0);
+    setMaxBudget(100000);
+    setMinRating(0);
     setVerifiedOnly(false);
     setAvailableTodayOnly(false);
     setSortBy('recommended');
@@ -111,7 +116,7 @@ export const ProvidersPage: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Natural language search (e.g. 'I need a Class 10 maths tutor in Jaipur' or 'My AC is not cooling')..."
+            placeholder="Search for a service or describe what you need (e.g. 'Class 10 maths tutor' or 'My AC is not cooling')..."
             className="w-full bg-slate-950 border border-slate-700 rounded-2xl pl-12 pr-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-inner"
           />
         </div>
@@ -122,7 +127,7 @@ export const ProvidersPage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
               <span>
-                AI Intent Detected: <b>{parsed.service || parsed.category}</b> {parsed.city ? `in ${parsed.city}` : ''}
+                AI Intent Detected: <b>{parsed.service || parsed.category}</b>
               </span>
             </div>
             <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-white">
@@ -145,21 +150,6 @@ export const ProvidersPage: React.FC = () => {
             <button onClick={handleResetFilters} className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
               <RefreshCw className="w-3 h-3" /> Reset
             </button>
-          </div>
-
-          {/* City Selector */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">City Location</label>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
-            >
-              <option value="">All Cities</option>
-              {INDIAN_CITIES.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
           </div>
 
           {/* Primary Category Selector */}
@@ -250,7 +240,6 @@ export const ProvidersPage: React.FC = () => {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="font-semibold text-slate-700">
               Showing <span className="font-extrabold text-slate-900">{rankedResults.length}</span> professionals
-              {selectedCity && <span> in <span className="text-blue-600 font-bold">{selectedCity}</span></span>}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -277,8 +266,18 @@ export const ProvidersPage: React.FC = () => {
               </div>
               <h3 className="font-bold text-lg text-slate-900">No Professionals Found</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Try loosening your filters or budget range to view available service experts.
+                {selectedService
+                  ? `There are currently no approved professionals listed for ${selectedService}. Send a request and our team can follow up.`
+                  : 'Try loosening your filters or budget range to view available service experts.'}
               </p>
+              {selectedService && (
+                <Link
+                  to={`/contact?request=professional&service=${encodeURIComponent(selectedService)}`}
+                  className="inline-flex rounded-xl bg-emerald-800 px-5 py-3 text-xs font-bold text-white shadow hover:bg-emerald-900"
+                >
+                  Request this service
+                </Link>
+              )}
               <button
                 onClick={handleResetFilters}
                 className="bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl text-xs"
@@ -289,7 +288,12 @@ export const ProvidersPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {rankedResults.map(({ provider, recommendation }) => (
-                <ProviderCard key={provider.id} provider={provider} recommendation={recommendation} />
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  recommendation={recommendation}
+                  selectedService={selectedService || parsed?.service || ''}
+                />
               ))}
             </div>
           )}

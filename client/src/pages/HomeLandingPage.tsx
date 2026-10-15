@@ -22,11 +22,12 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { categories, providers, currentCity, setCurrentCity } = useApp();
+  const approvedProviders = providers.filter((provider) => provider.verificationStatus === 'VERIFIED' && !provider.isDemo);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState(currentCity);
-  const recommendedResults = rankProvidersWithAI(providers, undefined, undefined, selectedCity);
-  const averageRating = providers.length
-    ? (providers.reduce((total, provider) => total + provider.rating, 0) / providers.length).toFixed(1)
+  const recommendedResults = rankProvidersWithAI(approvedProviders, undefined, undefined, selectedCity);
+  const averageRating = approvedProviders.length
+    ? (approvedProviders.reduce((total, provider) => total + provider.rating, 0) / approvedProviders.length).toFixed(1)
     : null;
 
   const handleHeroSearch = (event: React.FormEvent) => {
@@ -77,9 +78,9 @@ export const HomePage: React.FC = () => {
 
             <div className="home-proof-line">
               <div className="home-proof-avatars" aria-hidden="true">
-                {providers.slice(0, 3).map((provider) => <UserAvatar key={provider.id} src={provider.avatar} name={provider.name} className="home-proof-avatar" />)}
+                {approvedProviders.slice(0, 3).map((provider) => <UserAvatar key={provider.id} src={provider.avatar} name={provider.name} className="home-proof-avatar" />)}
               </div>
-              <span><strong>{providers.length} local professionals</strong> ready to lend a hand</span>
+              <span><strong>{approvedProviders.length} local professionals</strong> ready to lend a hand</span>
               <span className="home-proof-divider" />
               {averageRating && <span className="home-rating"><Star fill="currentColor" aria-hidden="true" /> {averageRating} <span>average rating</span></span>}
             </div>

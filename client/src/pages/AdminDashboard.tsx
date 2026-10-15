@@ -41,6 +41,18 @@ interface AdminRecordsResponse {
   transactions: AdminTransactionRecord[];
 }
 
+interface ProfessionalRequest {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  service: string;
+  profileName: string;
+  message: string;
+  status: 'NEW' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+}
+
 const downloadCsv = <T extends object,>(filename: string, columns: [keyof T, string][], rows: T[]) => {
   const escapeCell = (value: unknown) => {
     let cell = String(value ?? '');
@@ -83,10 +95,14 @@ export const AdminDashboard: React.FC = () => {
     services, addService, updateService, deleteService, updateComplaintStatus, updateBookingStatus 
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'services' | 'providers' | 'bookings' | 'complaints' | 'settings' | 'users' | 'transactions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'services' | 'providers' | 'professionalRequests' | 'bookings' | 'complaints' | 'settings' | 'users' | 'transactions'>('overview');
   const [adminRecords, setAdminRecords] = useState<AdminRecordsResponse>({ users: [], transactions: [] });
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [recordsError, setRecordsError] = useState('');
+  const [professionalRequests, setProfessionalRequests] = useState<ProfessionalRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestsError, setRequestsError] = useState('');
+  const [updatingRequestId, setUpdatingRequestId] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [transactionSearch, setTransactionSearch] = useState('');
 
@@ -106,6 +122,37 @@ export const AdminDashboard: React.FC = () => {
     }
   }, [requestAdminRecords]);
 
+  const loadProfessionalRequests = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setRequestsLoading(true);
+      setRequestsError('');
+    }
+    try {
+      const result = await apiRequest<{ requests: ProfessionalRequest[] }>('/api/admin/professional-requests');
+      setProfessionalRequests(result.requests);
+    } catch (error) {
+      setRequestsError(error instanceof Error ? error.message : 'Could not load professional requests.');
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, []);
+
+  const updateProfessionalRequest = async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
+    setUpdatingRequestId(requestId);
+    setRequestsError('');
+    try {
+      const updated = await apiRequest<ProfessionalRequest>(`/api/admin/professional-requests/${requestId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+      setProfessionalRequests((current) => current.map((request) => request.id === requestId ? updated : request));
+    } catch (error) {
+      setRequestsError(error instanceof Error ? error.message : 'Could not update this professional request.');
+    } finally {
+      setUpdatingRequestId('');
+    }
+  };
+
   useEffect(() => {
     let isCurrent = true;
     requestAdminRecords()
@@ -124,6 +171,10 @@ export const AdminDashboard: React.FC = () => {
       isCurrent = false;
     };
   }, [requestAdminRecords]);
+
+  useEffect(() => {
+    void loadProfessionalRequests(false);
+  }, [loadProfessionalRequests]);
 
   const verifiedProviders = providers.filter(p => p.verificationStatus === 'VERIFIED');
   const pendingProviders = providers.filter(p => p.verificationStatus === 'PENDING' || p.verificationStatus === 'UNDER_REVIEW');
@@ -154,6 +205,8 @@ export const AdminDashboard: React.FC = () => {
   const [editPvrName, setEditPvrName] = useState('');
   const [editPvrRate, setEditPvrRate] = useState(0);
   const [editPvrExp, setEditPvrExp] = useState(0);
+  const [editPvrCategoryId, setEditPvrCategoryId] = useState('');
+  const [editPvrServices, setEditPvrServices] = useState<string[]>([]);
 
   // Edit Category State
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
@@ -171,7 +224,7 @@ export const AdminDashboard: React.FC = () => {
   const [newCategoryIcon, setNewCategoryIcon] = useState('Layers');
   const [newCategoryImage, setNewCategoryImage] = useState('');
   const [newProvider, setNewProvider] = useState({
-    name: '', email: '', mobile: '', password: '', city: '', categoryId: '',
+    name: '', email: '', mobile: '', password: '', city: '', categoryId: '', avatar: '',
     qualification: '', experienceYears: 0, startingPrice: 499, serviceArea: '', bio: ''
   });
   const [newProviderServices, setNewProviderServices] = useState<string[]>([]);
@@ -251,9 +304,17 @@ export const AdminDashboard: React.FC = () => {
     setCatalogFormSuccess('');
     setCatalogFormLoading(true);
     try {
-      await addProviderAccount({ ...newProvider, servicesOffered: newProviderServices });
+      const selectedCategory = categories.find((category) => category.id === newProvider.categoryId);
+      if (!selectedCategory || newProviderServices.length === 0) {
+        throw new Error('Choose a category and at least one service.');
+      }
+      await addProviderAccount({
+        ...newProvider,
+        categoryName: selectedCategory.name,
+        servicesOffered: newProviderServices
+      });
       setNewProvider({
-        name: '', email: '', mobile: '', password: '', city: '', categoryId: '',
+        name: '', email: '', mobile: '', password: '', city: '', categoryId: '', avatar: '',
         qualification: '', experienceYears: 0, startingPrice: 499, serviceArea: '', bio: ''
       });
       setNewProviderServices([]);
@@ -276,10 +337,15 @@ export const AdminDashboard: React.FC = () => {
 
   const handleSaveProviderEdit = () => {
     if (!editingProvider) return;
+    const category = categories.find((item) => item.id === editPvrCategoryId);
+    if (!category || editPvrServices.length === 0) return;
     updateProviderDetails(editingProvider.id, {
       name: editPvrName,
       startingPrice: editPvrRate,
-      experienceYears: editPvrExp
+      experienceYears: editPvrExp,
+      category: category.name,
+      servicesOffered: editPvrServices,
+      skills: editPvrServices
     });
     setEditingProvider(null);
   };
@@ -371,6 +437,17 @@ export const AdminDashboard: React.FC = () => {
           {pendingProviders.length > 0 && (
             <span className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
               {pendingProviders.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('professionalRequests')}
+          className={`pb-3 border-b-2 transition relative ${activeTab === 'professionalRequests' ? 'border-purple-600 text-purple-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+        >
+          <span>Professional Requests ({professionalRequests.length})</span>
+          {professionalRequests.filter((request) => request.status === 'NEW').length > 0 && (
+            <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              {professionalRequests.filter((request) => request.status === 'NEW').length}
             </span>
           )}
         </button>
@@ -756,7 +833,71 @@ export const AdminDashboard: React.FC = () => {
 
       {/* TAB 4: PROVIDERS EDIT & VERIFICATION MANAGER */}
       {activeTab === 'providers' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+        <div className="space-y-6">
+          <form onSubmit={handleAddProvider} className="rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-sm space-y-4">
+            <div>
+              <h3 className="font-bold text-lg">Add a Professional to a Service</h3>
+              <p className="mt-1 text-sm text-slate-300">Choose the category and exact services they provide. New profiles are saved to the database and remain hidden until approved.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <input value={newProvider.name} onChange={(event) => setNewProvider({ ...newProvider, name: event.target.value })} placeholder="Professional name" maxLength={100} required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input type="email" value={newProvider.email} onChange={(event) => setNewProvider({ ...newProvider, email: event.target.value })} placeholder="Email address" required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input type="tel" value={newProvider.mobile} onChange={(event) => setNewProvider({ ...newProvider, mobile: event.target.value })} placeholder="Mobile number" required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input type="password" value={newProvider.password} onChange={(event) => setNewProvider({ ...newProvider, password: event.target.value })} placeholder="Temporary password (12+ characters)" minLength={12} required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input value={newProvider.city} onChange={(event) => setNewProvider({ ...newProvider, city: event.target.value })} placeholder="City" maxLength={100} required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <select
+                value={newProvider.categoryId}
+                onChange={(event) => {
+                  setNewProvider({ ...newProvider, categoryId: event.target.value });
+                  setNewProviderServices([]);
+                }}
+                required
+                className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+              >
+                <option value="">Select category</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+              <input type="url" value={newProvider.avatar} onChange={(event) => setNewProvider({ ...newProvider, avatar: event.target.value })} placeholder="Profile image URL (optional)" className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white sm:col-span-2" />
+              <input value={newProvider.qualification} onChange={(event) => setNewProvider({ ...newProvider, qualification: event.target.value })} placeholder="Qualification" maxLength={200} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input type="number" min={0} max={80} value={newProvider.experienceYears} onChange={(event) => setNewProvider({ ...newProvider, experienceYears: Number(event.target.value) })} placeholder="Years of experience" required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input type="number" min={1} value={newProvider.startingPrice} onChange={(event) => setNewProvider({ ...newProvider, startingPrice: Number(event.target.value) })} placeholder="Starting rate (INR)" required className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <input value={newProvider.serviceArea} onChange={(event) => setNewProvider({ ...newProvider, serviceArea: event.target.value })} placeholder="Service area (optional)" maxLength={200} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              <textarea value={newProvider.bio} onChange={(event) => setNewProvider({ ...newProvider, bio: event.target.value })} placeholder="Professional bio (optional)" maxLength={1000} rows={2} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white sm:col-span-2 lg:col-span-3" />
+              <fieldset className="sm:col-span-2 lg:col-span-3">
+                <legend className="mb-2 text-sm font-semibold text-slate-200">Services offered *</legend>
+                <div className="flex flex-wrap gap-2">
+                  {services.filter((service) => service.categoryId === newProvider.categoryId).map((service) => (
+                    <label key={service.id} className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={newProviderServices.includes(service.name)}
+                        onChange={(event) => setNewProviderServices((current) => event.target.checked
+                          ? [...current, service.name]
+                          : current.filter((name) => name !== service.name))}
+                        className="accent-blue-600"
+                      />
+                      {service.name}
+                    </label>
+                  ))}
+                  {!newProvider.categoryId && <p className="text-xs text-slate-400">Select a category to choose its services.</p>}
+                  {newProvider.categoryId && !services.some((service) => service.categoryId === newProvider.categoryId) && (
+                    <p className="text-xs text-amber-300">No catalog services exist for this category yet. Add a service first.</p>
+                  )}
+                </div>
+              </fieldset>
+            </div>
+            <button
+              type="submit"
+              disabled={catalogFormLoading || newProviderServices.length === 0}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" /> {catalogFormLoading ? 'Saving…' : 'Add Professional'}
+            </button>
+            {catalogFormError && <p role="alert" className="text-sm text-rose-300">{catalogFormError}</p>}
+            {catalogFormSuccess && <p role="status" className="text-sm text-emerald-300">{catalogFormSuccess}</p>}
+          </form>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
           <h3 className="font-bold text-slate-900 text-base">Manage & Edit Service Professionals</h3>
           
           <div className="divide-y divide-slate-100 space-y-4">
@@ -785,6 +926,9 @@ export const AdminDashboard: React.FC = () => {
                       setEditPvrName(p.name);
                       setEditPvrRate(p.startingPrice);
                       setEditPvrExp(p.experienceYears);
+                      const category = categories.find((item) => item.name.toLowerCase() === p.category.toLowerCase());
+                      setEditPvrCategoryId(category?.id || '');
+                      setEditPvrServices(p.servicesOffered || []);
                     }}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                   >
@@ -793,17 +937,103 @@ export const AdminDashboard: React.FC = () => {
 
                   <button
                     onClick={() => updateProviderVerification(p.id, p.verificationStatus === 'VERIFIED' ? 'SUSPENDED' : 'VERIFIED')}
+                    disabled={p.verificationStatus !== 'VERIFIED' && (!p.servicesOffered?.length || p.startingPrice <= 0)}
+                    title={p.verificationStatus !== 'VERIFIED' && (!p.servicesOffered?.length || p.startingPrice <= 0)
+                      ? 'Assign at least one service and set a starting rate before approval.'
+                      : undefined}
                     className={`font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 ${
-                      p.verificationStatus === 'VERIFIED' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-600 text-white'
+                      p.verificationStatus === 'VERIFIED'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-emerald-600 text-white disabled:cursor-not-allowed disabled:opacity-50'
                     }`}
                   >
                     {p.verificationStatus === 'VERIFIED' ? 'Suspend' : 'Approve Verified'}
                   </button>
+                  {p.verificationStatus !== 'REJECTED' && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Remove ${p.name} from the public professional listings? The record will remain available here for review.`)) {
+                          updateProviderVerification(p.id, 'REJECTED');
+                        }
+                      }}
+                      className="flex items-center gap-1 rounded-lg bg-rose-100 px-3 py-1.5 font-bold text-rose-800 hover:bg-rose-200"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Remove listing
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+            {providers.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No saved professionals yet. Add one using the form above.</p>}
+          </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'professionalRequests' && (
+        <section className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Requests for Professionals</h2>
+              <p className="mt-1 text-sm text-slate-500">Review customer requests for help finding an approved professional. Approving a request does not create a booking.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadProfessionalRequests()}
+              disabled={requestsLoading}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${requestsLoading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+          </div>
+          {requestsError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{requestsError}</p>}
+          {requestsLoading ? (
+            <p className="py-8 text-center text-sm text-slate-500">Loading professional requests…</p>
+          ) : professionalRequests.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">No professional requests have been submitted.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {professionalRequests.map((request) => (
+                <article key={request.id} className="flex flex-col justify-between gap-4 py-4 md:flex-row md:items-start">
+                  <div className="space-y-1 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-slate-900">{request.service}</h3>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        request.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800'
+                          : request.status === 'REJECTED' ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                      }`}>{request.status}</span>
+                    </div>
+                    <p className="text-slate-700">{request.name} · <a className="text-blue-700 underline" href={`mailto:${encodeURIComponent(request.email)}`}>{request.email}</a>{request.phone ? ` · ${request.phone}` : ''}</p>
+                    {request.profileName && <p className="text-xs text-slate-500">Profile viewed: {request.profileName}</p>}
+                    <p className="whitespace-pre-wrap text-slate-600">{request.message}</p>
+                    <p className="text-xs text-slate-400">{new Date(request.createdAt).toLocaleString()}</p>
+                  </div>
+                  {request.status === 'NEW' && (
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        disabled={updatingRequestId === request.id}
+                        onClick={() => void updateProfessionalRequest(request.id, 'APPROVED')}
+                        className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+                      >
+                        Approve request
+                      </button>
+                      <button
+                        type="button"
+                        disabled={updatingRequestId === request.id}
+                        onClick={() => void updateProfessionalRequest(request.id, 'REJECTED')}
+                        className="rounded-lg bg-rose-100 px-3 py-2 text-xs font-bold text-rose-800 hover:bg-rose-200 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {/* TAB 5: BOOKINGS MANAGER */}
@@ -957,6 +1187,44 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div>
+                <label className="font-bold block mb-1">Service Category</label>
+                <select
+                  value={editPvrCategoryId}
+                  onChange={(event) => {
+                    setEditPvrCategoryId(event.target.value);
+                    setEditPvrServices([]);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                >
+                  <option value="">Select category</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </div>
+
+              <fieldset>
+                <legend className="font-bold block mb-1">Services Offered</legend>
+                <div className="flex flex-wrap gap-2">
+                  {services.filter((service) => service.categoryId === editPvrCategoryId).map((service) => (
+                    <label key={service.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={editPvrServices.includes(service.name)}
+                        onChange={(event) => setEditPvrServices((current) => event.target.checked
+                          ? [...current, service.name]
+                          : current.filter((name) => name !== service.name))}
+                        className="accent-blue-600"
+                      />
+                      {service.name}
+                    </label>
+                  ))}
+                  {!editPvrCategoryId && <p className="text-slate-500">Select a category to choose services.</p>}
+                  {editPvrCategoryId && !services.some((service) => service.categoryId === editPvrCategoryId) && (
+                    <p className="text-amber-700">Add a service to this category before assigning the professional.</p>
+                  )}
+                </div>
+              </fieldset>
+
+              <div>
                 <label className="font-bold block mb-1">Starting Rate ₹</label>
                 <input
                   type="number"
@@ -978,7 +1246,8 @@ export const AdminDashboard: React.FC = () => {
 
               <button
                 onClick={handleSaveProviderEdit}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-1"
+                disabled={!editPvrCategoryId || editPvrServices.length === 0 || !editPvrName.trim() || editPvrRate <= 0}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-1"
               >
                 <Save className="w-4 h-4" /> Save Provider Changes
               </button>

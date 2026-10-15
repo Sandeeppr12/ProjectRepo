@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Calendar, Clock, MapPin, Banknote, CreditCard, ShieldCheck, CheckCircle2, 
   ArrowRight, ArrowLeft, Building2, Upload, AlertCircle, LoaderCircle 
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { INDIAN_CITIES } from '../data/mockData';
-import type { Booking } from '../types';
+import type { Booking, Provider } from '../types';
 import { postJson } from '../utils/api';
 
 interface PaymentOrder {
@@ -48,6 +48,48 @@ interface RazorpayCheckoutOptions {
   modal: { ondismiss: () => void };
 }
 
+interface BookingDraft {
+  selectedService: string;
+  bookingDate: string;
+  timeSlot: string;
+  address: string;
+  city: string;
+  pincode: string;
+  requirements: string;
+  paymentChoice: 'ONLINE' | 'PAY_AFTER_SERVICE';
+}
+
+const readBookingDraft = (providerId: string): Partial<BookingDraft> => {
+  try {
+    const stored = sessionStorage.getItem(`booking-draft:${providerId}`);
+    if (!stored) return {};
+    const value: unknown = JSON.parse(stored);
+    if (!value || typeof value !== 'object') return {};
+
+    const draft = value as Record<string, unknown>;
+    return {
+      ...(typeof draft.selectedService === 'string' ? { selectedService: draft.selectedService } : {}),
+      ...(typeof draft.bookingDate === 'string' ? { bookingDate: draft.bookingDate } : {}),
+      ...(typeof draft.timeSlot === 'string' ? { timeSlot: draft.timeSlot } : {}),
+      ...(typeof draft.address === 'string' ? { address: draft.address } : {}),
+      ...(typeof draft.city === 'string' ? { city: draft.city } : {}),
+      ...(typeof draft.pincode === 'string' ? { pincode: draft.pincode } : {}),
+      ...(typeof draft.requirements === 'string' ? { requirements: draft.requirements } : {}),
+      ...(draft.paymentChoice === 'ONLINE' || draft.paymentChoice === 'PAY_AFTER_SERVICE'
+        ? { paymentChoice: draft.paymentChoice }
+        : {})
+    };
+  } catch {
+    return {};
+  }
+};
+
+const getTomorrowDate = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().slice(0, 10);
+};
+
 declare global {
   interface Window {
     Razorpay?: new (options: RazorpayCheckoutOptions) => { open: () => void };
@@ -70,23 +112,81 @@ const loadRazorpayCheckout = () => new Promise<boolean>((resolve) => {
 
 export const BookingWizardPage: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
+  const { providers } = useApp();
+  const provider = providers.find((item) => item.id === providerId);
+
+  if (provider?.isDemo || (provider && provider.verificationStatus !== 'VERIFIED')) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Professional not approved</h1>
+        <p className="mt-3 text-sm text-slate-600">Booking is available only for professionals approved by the administrator.</p>
+        <Link to="/providers" className="mt-6 inline-flex rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
+          Browse professionals
+        </Link>
+      </div>
+    );
+  }
+
+  if (!provider) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Professional unavailable</h1>
+        <p className="mt-3 text-sm text-slate-600">This service can be booked once a professional is available. Please return to the directory and choose an available professional.</p>
+        <Link to="/providers" className="mt-6 inline-flex rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
+          Browse professionals
+        </Link>
+      </div>
+    );
+  }
+
+  return <BookingWizardForProvider provider={provider} />;
+};
+
+const BookingWizardForProvider: React.FC<{ provider: Provider }> = ({ provider }) => {
+  const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
-  const { providers, services, currentUser, createBooking, commissionPercentage, currentCity } = useApp();
+  const [searchParams] = useSearchParams();
+  const { currentUser, createBooking, commissionPercentage, currentCity } = useApp();
+  const draft = readBookingDraft(providerId || '');
+  const requestedService = searchParams.get('service') || '';
 
-  const provider = providers.find(p => p.id === providerId) || providers[0];
-
-  const [step, setStep] = useState<number>(1);
-  const [selectedService, setSelectedService] = useState<string>(provider.servicesOffered[0] || 'General Service');
-  const [bookingDate, setBookingDate] = useState<string>('2026-09-28');
-  const [timeSlot, setTimeSlot] = useState<string>('10:00 AM - 12:00 PM');
-  const [address, setAddress] = useState<string>('Flat 402, Sunshine Heights, Tonk Road');
-  const [city, setCity] = useState<string>(provider.city || currentCity);
-  const [pincode, setPincode] = useState<string>('302018');
-  const [requirements, setRequirements] = useState<string>('');
-  const [paymentChoice, setPaymentChoice] = useState<'ONLINE' | 'PAY_AFTER_SERVICE'>('ONLINE');
+  const [step, setStep] = useState<number>(() => (
+    searchParams.get('resume') === 'payment' ? 4 : 1
+  ));
+  const currentStep = step === 4 && currentUser?.role !== 'customer' ? 3 : step;
+  const [selectedService, setSelectedService] = useState<string>(() => (
+    provider.servicesOffered.includes(requestedService)
+      ? requestedService
+      : draft.selectedService && provider.servicesOffered.includes(draft.selectedService)
+        ? draft.selectedService
+        : provider.servicesOffered[0] || 'General Service'
+  ));
+  const [bookingDate, setBookingDate] = useState<string>(draft.bookingDate || getTomorrowDate());
+  const [timeSlot, setTimeSlot] = useState<string>(draft.timeSlot || '10:00 AM - 12:00 PM');
+  const [address, setAddress] = useState<string>(draft.address || '');
+  const [city, setCity] = useState<string>(draft.city || provider.city || currentCity);
+  const [pincode, setPincode] = useState<string>(draft.pincode || '');
+  const [requirements, setRequirements] = useState<string>(draft.requirements || '');
+  const [paymentChoice, setPaymentChoice] = useState<'ONLINE' | 'PAY_AFTER_SERVICE'>(draft.paymentChoice || 'ONLINE');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string>('');
+  const [showAuthPrompt, setShowAuthPrompt] = useState<boolean>(false);
+  const [authGateMessage, setAuthGateMessage] = useState<string>('');
   const [testPaymentOrder, setTestPaymentOrder] = useState<PaymentOrder | null>(null);
+
+  useEffect(() => {
+    if (!providerId) return;
+    sessionStorage.setItem(`booking-draft:${providerId}`, JSON.stringify({
+      selectedService,
+      bookingDate,
+      timeSlot,
+      address,
+      city,
+      pincode,
+      requirements,
+      paymentChoice
+    } satisfies BookingDraft));
+  }, [providerId, selectedService, bookingDate, timeSlot, address, city, pincode, requirements, paymentChoice]);
 
   const basePrice = provider.startingPrice;
   const commissionAmount = Number(((basePrice * commissionPercentage) / 100).toFixed(2));
@@ -132,7 +232,7 @@ export const BookingWizardPage: React.FC = () => {
 
   const saveBooking = (payment: Pick<Booking, 'totalAmount' | 'paymentMethod' | 'paymentStatus' | 'paymentId'>) => {
     const commission = Number(((payment.totalAmount * commissionPercentage) / 100).toFixed(2));
-    return createBooking({
+    const booking = createBooking({
       customerId: currentUser!.id,
       customerName: currentUser!.name,
       customerEmail: currentUser!.email,
@@ -158,11 +258,15 @@ export const BookingWizardPage: React.FC = () => {
       paymentStatus: payment.paymentStatus,
       status: 'PENDING'
     });
+    if (providerId) sessionStorage.removeItem(`booking-draft:${providerId}`);
+    return booking;
   };
 
   const handleCompleteBooking = async () => {
-    if (!currentUser) {
-      navigate('/login');
+    if (!currentUser || currentUser.role !== 'customer') {
+      setStep(3);
+      setShowAuthPrompt(true);
+      setAuthGateMessage(currentUser ? 'Please use a customer account to place a booking.' : '');
       return;
     }
 
@@ -230,13 +334,32 @@ export const BookingWizardPage: React.FC = () => {
     }
   };
 
+  const handleProceedToPayment = () => {
+    if (!currentUser) {
+      setAuthGateMessage('');
+      setShowAuthPrompt(true);
+      return;
+    }
+    if (currentUser.role !== 'customer') {
+      setAuthGateMessage('Please use a customer account to place a booking.');
+      setShowAuthPrompt(true);
+      return;
+    }
+    setShowAuthPrompt(false);
+    setStep(4);
+  };
+
+  const continueBookingUrl = `/book/${provider.id}?service=${encodeURIComponent(selectedService)}&resume=payment`;
+  const loginUrl = `/login?returnTo=${encodeURIComponent(continueBookingUrl)}`;
+  const registerUrl = `/register?returnTo=${encodeURIComponent(continueBookingUrl)}`;
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       
       {/* Header Wizard Progress Bar */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4">
         <div className="flex justify-between items-center text-xs text-slate-300">
-          <span className="font-bold text-blue-400 uppercase tracking-widest">Step 0{step} of 04</span>
+          <span className="font-bold text-blue-400 uppercase tracking-widest">Step 0{currentStep} of 04</span>
           <span>Booking with <b>{provider.name}</b></span>
         </div>
 
@@ -244,7 +367,7 @@ export const BookingWizardPage: React.FC = () => {
         <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
           <div 
             className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-300"
-            style={{ width: `${(step / 4) * 100}%` }}
+            style={{ width: `${(currentStep / 4) * 100}%` }}
           ></div>
         </div>
       </div>
@@ -253,7 +376,7 @@ export const BookingWizardPage: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
         
         {/* STEP 1: Select Service */}
-        {step === 1 && (
+        {currentStep === 1 && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-slate-900">1. Select Service & Requirements</h2>
             
@@ -300,7 +423,7 @@ export const BookingWizardPage: React.FC = () => {
         )}
 
         {/* STEP 2: Date & Time Slot */}
-        {step === 2 && (
+        {currentStep === 2 && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-slate-900">2. Select Appointment Date & Time</h2>
 
@@ -350,7 +473,7 @@ export const BookingWizardPage: React.FC = () => {
         )}
 
         {/* STEP 3: Address Details */}
-        {step === 3 && (
+        {currentStep === 3 && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-slate-900">3. Service Delivery Address</h2>
 
@@ -400,18 +523,35 @@ export const BookingWizardPage: React.FC = () => {
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <button
-                onClick={() => setStep(4)}
+                onClick={handleProceedToPayment}
                 className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-2 shadow"
               >
                 <span>Proceed to Payment</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+            {showAuthPrompt && (
+              <div role="alert" className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <h3 className="font-bold text-slate-900">Sign in or create an account to continue</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Your booking details are saved for this session. You’ll return here before payment.
+                </p>
+                {authGateMessage && <p className="mt-2 text-sm font-medium text-rose-700">{authGateMessage}</p>}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button type="button" onClick={() => navigate(loginUrl)} className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white">
+                    Sign in
+                  </button>
+                  <button type="button" onClick={() => navigate(registerUrl)} className="rounded-xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-semibold text-blue-800">
+                    Create account
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* STEP 4: Summary & Payment Gateway */}
-        {step === 4 && (
+        {currentStep === 4 && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-slate-900">4. Review Price Breakdown & Payment</h2>
 

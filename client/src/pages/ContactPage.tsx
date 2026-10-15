@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import emailjs from '@emailjs/browser';
 import { Mail, Phone, MapPin, Send, CheckCircle2, AlertCircle, Loader2, User, MessageSquare, Tag } from 'lucide-react';
+import { apiRequest } from '../utils/api';
 
 // ─── EMAILJS CONFIG ────────────────────────────────────────────────────────
 // Follow the setup guide below to get these values from emailjs.com
@@ -13,13 +15,19 @@ type FormStatus = 'idle' | 'sending' | 'success' | 'error';
 
 export const ContactPage: React.FC = () => {
   const formRef = useRef<HTMLFormElement>(null);
+  const [searchParams] = useSearchParams();
+  const professionalRequest = searchParams.get('request') === 'professional';
+  const requestedService = searchParams.get('service') || 'the requested service';
+  const requestedProfile = searchParams.get('profile');
 
   const [formData, setFormData] = useState({
     from_name: '',
     from_email: '',
     phone: '',
-    subject: '',
-    message: '',
+    subject: professionalRequest ? 'Service Provider Issue' : '',
+    message: professionalRequest
+      ? `I’m looking for a real professional for ${requestedService}.${requestedProfile ? ` I saw the fictional profile for ${requestedProfile}; I understand that profile is not bookable.` : ''}`
+      : '',
   });
 
   const [status, setStatus] = useState<FormStatus>('idle');
@@ -35,12 +43,26 @@ export const ContactPage: React.FC = () => {
     setErrorMsg('');
 
     try {
-      await emailjs.sendForm(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        formRef.current!,
-        { publicKey: EMAILJS_PUBLIC_KEY }
-      );
+      if (professionalRequest) {
+        await apiRequest('/api/professional-requests', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: formData.from_name,
+            email: formData.from_email,
+            phone: formData.phone,
+            service: requestedService,
+            profileName: requestedProfile || '',
+            message: formData.message
+          })
+        });
+      } else {
+        await emailjs.sendForm(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          formRef.current!,
+          { publicKey: EMAILJS_PUBLIC_KEY }
+        );
+      }
       setStatus('success');
       setFormData({ from_name: '', from_email: '', phone: '', subject: '', message: '' });
     } catch (err: any) {
@@ -63,7 +85,9 @@ export const ContactPage: React.FC = () => {
             We'd Love to <span className="text-blue-600">Hear From You</span>
           </h1>
           <p className="text-slate-500 text-sm max-w-xl mx-auto">
-            Fill out the form below and we'll get back to you within 2 business hours.
+            {professionalRequest
+              ? `Tell us how to reach you and we'll follow up about arranging ${requestedService} with a real professional. This request is not a confirmed booking.`
+              : "Fill out the form below and we'll get back to you within 2 business hours."}
           </p>
         </div>
 
@@ -154,16 +178,18 @@ export const ContactPage: React.FC = () => {
             <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
               <h2 className="font-bold text-slate-900 text-lg mb-6 flex items-center space-x-2">
                 <MessageSquare className="w-5 h-5 text-blue-600" />
-                <span>Send Us a Message</span>
+                <span>{professionalRequest ? 'Request a Booking' : 'Send Us a Message'}</span>
               </h2>
 
               {/* Success State */}
               {status === 'success' && (
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-6 rounded-2xl text-center space-y-3 mb-6">
                   <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-                  <div className="font-bold text-base">Message Sent Successfully! 🎉</div>
+                  <div className="font-bold text-base">{professionalRequest ? 'Request Received!' : 'Message Sent Successfully! 🎉'}</div>
                   <p className="text-sm text-emerald-700">
-                    We've received your query and will reply within 2 hours.
+                    {professionalRequest
+                      ? 'Your request is saved for the administrator to review. This is not a confirmed booking.'
+                      : "We've received your query and will reply within 2 hours."}
                   </p>
                   <button
                     onClick={() => setStatus('idle')}
@@ -292,7 +318,7 @@ export const ContactPage: React.FC = () => {
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>Send Message</span>
+                        <span>{professionalRequest ? 'Send Booking Request' : 'Send Message'}</span>
                       </>
                     )}
                   </button>

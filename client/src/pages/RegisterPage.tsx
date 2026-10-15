@@ -13,6 +13,10 @@ export const RegisterPage: React.FC = () => {
   const { setCurrentUser, isFirebaseConnected } = useApp();
 
   const initialRole = searchParams.get('role') === 'provider' ? 'provider' : 'customer';
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo = requestedReturnTo?.startsWith('/') && !requestedReturnTo.startsWith('//')
+    ? requestedReturnTo
+    : null;
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -87,7 +91,7 @@ export const RegisterPage: React.FC = () => {
       });
       setAuthToken(result.token);
       setCurrentUser(result.user);
-      navigate(role === 'provider' ? '/provider/dashboard' : '/customer/dashboard');
+      navigate(role === 'customer' && returnTo ? returnTo : role === 'provider' ? '/provider/dashboard' : '/customer/dashboard');
     } catch (registrationError) {
       setError(registrationError instanceof Error ? registrationError.message : 'Could not verify your email. Please try again.');
     } finally {
@@ -102,7 +106,7 @@ export const RegisterPage: React.FC = () => {
       description="Choose how you’d like to use Digital Vistara. You can discover services or offer your skills."
       footer={(
         <div className="auth-form-footer">
-          Already have an account? <Link to="/login">Sign in</Link>
+          Already have an account? <Link to={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login'}>Sign in</Link>
         </div>
       )}
     >

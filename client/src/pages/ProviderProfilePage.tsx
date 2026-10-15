@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, Star, MapPin, Briefcase, Clock, Calendar, 
   MessageSquare, ShieldCheck, Award, Image as ImageIcon, Heart, ArrowRight, BookOpen
@@ -10,11 +10,26 @@ import { UserAvatar } from '../components/UserAvatar';
 export const ProviderProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { providers, reviews, favorites, toggleFavorite } = useApp();
+  const { providers, services, reviews, favorites, toggleFavorite } = useApp();
+  const marketplaceProviders = useMemo(
+    () => providers.filter((provider) => provider.verificationStatus === 'VERIFIED' && !provider.isDemo),
+    [providers]
+  );
 
   const [activeTab, setActiveTab] = useState<'about' | 'services' | 'portfolio' | 'reviews' | 'availability'>('about');
 
-  const provider = providers.find(p => p.id === id) || providers[0];
+  const provider = marketplaceProviders.find(p => p.id === id);
+  if (!provider) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Professional unavailable</h1>
+        <p className="mt-3 text-sm text-slate-600">This profile is not currently approved for the marketplace.</p>
+        <Link to="/providers" className="mt-6 inline-flex rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
+          Browse approved professionals
+        </Link>
+      </div>
+    );
+  }
   const providerReviews = reviews.filter(r => r.providerId === provider.id);
   const isFav = favorites.includes(provider.id);
 
@@ -23,7 +38,6 @@ export const ProviderProfilePage: React.FC = () => {
       
       {/* Top Header Profile Banner */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm relative space-y-6">
-        
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start space-x-5">
             <div className="relative">
@@ -80,21 +94,36 @@ export const ProviderProfilePage: React.FC = () => {
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Starting Rate</span>
               <div className="text-2xl font-extrabold text-slate-900 mt-0.5">
-                ₹{provider.startingPrice} <span className="text-xs text-slate-500 font-normal">/ service</span>
+                ₹{provider.startingPrice} <span className="text-xs text-slate-500 font-normal">/ {services.find((service) => service.name === provider.servicesOffered[0])?.unit || 'service'}</span>
               </div>
               <span className="text-[10px] text-emerald-600 font-medium block mt-1">✓ Upfront transparent pricing</span>
             </div>
 
             <div className="space-y-2">
-              <button
-                onClick={() => navigate(`/book/${provider.id}`)}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg shadow-blue-600/30 transition flex items-center justify-center space-x-1.5"
-              >
-                <span>Book Service</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {provider.isDemo ? (
+                <Link
+                  to={`/contact?${new URLSearchParams({
+                    request: 'professional',
+                    service: provider.servicesOffered[0] || '',
+                    profile: provider.name
+                  }).toString()}`}
+                  className="group flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-700 bg-blue-700 px-4 py-3 text-center text-sm font-extrabold !text-white shadow-lg shadow-blue-600/40 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-800 hover:bg-blue-800 hover:shadow-xl active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300"
+                  style={{ color: '#fff' }}
+                >
+                  <span>Request Booking</span>
+                  <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
+                </Link>
+              ) : (
+                <button
+                  onClick={() => navigate(`/book/${provider.id}?service=${encodeURIComponent(provider.servicesOffered[0] || '')}`)}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg shadow-blue-600/30 transition flex items-center justify-center space-x-1.5"
+                >
+                  <span>Book Service</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
 
-              <div className="flex gap-2">
+              {!provider.isDemo && <div className="flex gap-2">
                 <button
                   onClick={() => navigate(`/customer/messages`)}
                   className="flex-1 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center space-x-1 transition"
@@ -108,7 +137,7 @@ export const ProviderProfilePage: React.FC = () => {
                 >
                   <Heart className={`w-4 h-4 ${isFav ? 'fill-rose-500' : ''}`} />
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
 
@@ -185,12 +214,16 @@ export const ProviderProfilePage: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <span className="font-extrabold text-slate-900 text-sm">Starting ₹{provider.startingPrice}</span>
-                    <button
-                      onClick={() => navigate(`/book/${provider.id}`)}
-                      className="block mt-1 text-xs text-blue-600 hover:underline font-semibold"
-                    >
-                      Book Now →
-                    </button>
+                    {provider.isDemo ? (
+                      <span className="mt-1 block text-[10px] font-semibold text-amber-800">Sample rate · booking disabled</span>
+                    ) : (
+                      <button
+                        onClick={() => navigate(`/book/${provider.id}?service=${encodeURIComponent(srv)}`)}
+                        className="block mt-1 text-xs text-blue-600 hover:underline font-semibold"
+                      >
+                        Book Now →
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
