@@ -41,7 +41,7 @@ export const RegisterPage: React.FC = () => {
 
     setIsSubmitting(true);
     const requestController = new AbortController();
-    const requestTimeout = window.setTimeout(() => requestController.abort(), 25000);
+    const requestTimeout = window.setTimeout(() => requestController.abort(), 45000);
     try {
       const result = await postJson<{ message: string }>('/api/auth/register/request-otp', {
         name: name.trim(),

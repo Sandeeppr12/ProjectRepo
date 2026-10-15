@@ -97,54 +97,53 @@ const getRegistrationMailTransport = () => {
   return registrationMailTransport;
 };
 
-const getRegistrationMailSender = () => {
-  const configuredSender = process.env.SMTP_FROM || process.env.SMTP_USER || '';
-  const senderMatch = configuredSender.match(/^(.*?)\s*<([^<>]+)>$/);
-  const name = senderMatch?.[1].trim() || 'Digital Vistara';
-  const email = (senderMatch?.[2] || configuredSender).trim();
-  if (!/^\S+@\S+\.\S+$/.test(email)) return null;
-  return { name, email };
+const isGmailBridgeUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:'
+      && url.hostname === 'script.google.com'
+      && /^\/macros\/s\/[^/]+\/exec$/.test(url.pathname);
+  } catch {
+    return false;
+  }
 };
 
-const sendRegistrationEmail = async ({ to, name, otp, mailTransport }) => {
+const sendRegistrationEmail = async ({ to, name, otp, mailTransport, bridgeUrl, bridgeSecret }) => {
   const subject = 'Your Digital Vistara verification code';
   const text = `Hello ${name},\n\nYour Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share this code with anyone.\n\nIf you did not request this code, you can ignore this email.`;
-  const apiKey = process.env.BREVO_API_KEY;
 
-  if (!apiKey) {
-    return mailTransport.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to,
-      subject,
-      text
-    });
+  if (bridgeUrl && bridgeSecret) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+    try {
+      const response = await fetch(bridgeUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ secret: bridgeSecret, to, subject, text }),
+        signal: controller.signal
+      });
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error(`Gmail email bridge returned an invalid response (HTTP ${response.status}).`);
+      }
+      if (!response.ok || result.ok !== true) {
+        throw new Error(`Gmail email bridge could not send the message (HTTP ${response.status}).`);
+      }
+      return;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  const sender = getRegistrationMailSender();
-  if (!sender) throw new Error('SMTP_FROM must contain a valid sender email address when using Brevo.');
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        sender,
-        to: [{ email: to }],
-        subject,
-        textContent: text
-      }),
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error(`Brevo email API returned HTTP ${response.status}.`);
-  } finally {
-    clearTimeout(timeout);
-  }
+  if (!mailTransport) throw new Error('Registration email sender is not configured.');
+  return mailTransport.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject,
+    text
+  });
 };
 
 const isValidMobileNumber = (mobile) => {
@@ -248,15 +247,22 @@ const validateRegistrationInput = (body) => {
 
 app.post('/api/auth/register/request-otp', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Firebase is not configured on the server.' });
-  const mailTransport = process.env.BREVO_API_KEY ? null : getRegistrationMailTransport();
-  if (!process.env.BREVO_API_KEY && !mailTransport) {
+  const bridgeUrl = process.env.GMAIL_BRIDGE_URL?.trim() || '';
+  const bridgeSecret = process.env.GMAIL_BRIDGE_SECRET || '';
+  if (Boolean(bridgeUrl) !== Boolean(bridgeSecret)) {
     return res.status(503).json({
-      error: 'Email verification is not configured on the server. Contact the site administrator.'
+      error: 'The Gmail email bridge is only partially configured. Contact the site administrator.'
     });
   }
-  if (process.env.BREVO_API_KEY && !getRegistrationMailSender()) {
+  if (bridgeUrl && !isGmailBridgeUrl(bridgeUrl)) {
     return res.status(503).json({
-      error: 'Email verification sender is not configured correctly. Contact the site administrator.'
+      error: 'The Gmail email bridge URL is invalid. Contact the site administrator.'
+    });
+  }
+  const mailTransport = bridgeUrl ? null : getRegistrationMailTransport();
+  if (!bridgeUrl && !mailTransport) {
+    return res.status(503).json({
+      error: 'Email verification is not configured on the server. Contact the site administrator.'
     });
   }
 
@@ -319,7 +325,9 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
         to: registration.email,
         name: registration.name,
         otp,
-        mailTransport
+        mailTransport,
+        bridgeUrl,
+        bridgeSecret
       });
     } catch (deliveryError) {
       console.error('Registration OTP email delivery failed:', deliveryError.message || 'Unknown delivery error');
@@ -330,9 +338,7 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
         }
       });
       return res.status(502).json({
-        error: process.env.BREVO_API_KEY
-          ? 'The email provider could not deliver the verification code. Check the sender configuration and try again.'
-          : 'The email server did not respond in time. Configure an HTTPS email API for this host or contact support.'
+        error: 'The verification email could not be sent. Please try again later or contact support.'
       });
     }
 

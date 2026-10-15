@@ -64,16 +64,25 @@ SMTP_FROM=Digital Vistara <your-sender@gmail.com>
 
 Use an SMTP credential or app password from your mail provider, not your normal mailbox password. For Gmail, create an App Password after enabling 2-Step Verification.
 
-If the hosting platform blocks outbound SMTP, configure `BREVO_API_KEY` to deliver verification emails over HTTPS instead. Set `SMTP_FROM` to a sender address verified in Brevo. When `BREVO_API_KEY` is present, it takes precedence over SMTP.
+Render Free blocks outbound SMTP ports, so Gmail SMTP cannot send from the free hosted API. To keep email delivery free, use the Google Apps Script bridge in `server/google-apps-script/Code.gs`: deploy it as a web app that executes as your Google account, set access to anyone, then set `GMAIL_BRIDGE_URL` to its `/exec` URL and `GMAIL_BRIDGE_SECRET` to the same private random secret used in the script. The script sends through your Gmail account over HTTPS. Google currently documents a quota of 100 email recipients per day for consumer accounts; quotas may change.
 
-Keep mail credentials in the server environment only, never in the client or source control, and restart the API after changing them. SMTP and HTTPS API requests have bounded timeouts. If email delivery fails, registration returns an explicit error and no account is created.
+### Set up the free Gmail bridge
+
+1. Open [Google Apps Script](https://script.google.com/home/start) while signed in to the Gmail account that will send OTP messages, then create a new project.
+2. Replace the contents of `Code.gs` with `server/google-apps-script/Code.gs`. In the script, replace `REPLACE_WITH_A_LONG_RANDOM_SECRET` with a unique random secret (at least 32 characters). Keep it private; do not put it in chat or source control.
+3. In Project Settings, enable showing the `appsscript.json` manifest, then replace its contents with `server/google-apps-script/appsscript.json`. Save the project.
+4. Select **Deploy > New deployment**, choose **Web app**, set **Execute as** to your account and **Who has access** to **Anyone**, then deploy and approve the permission to send email. Copy the web app URL ending in `/exec`.
+5. In Render, add `GMAIL_BRIDGE_URL` with that `/exec` URL and `GMAIL_BRIDGE_SECRET` with the exact same private secret from step 2. Save and deploy the service.
+6. After Render reports the deploy is live, submit a registration using an email inbox you can check. The verification code should arrive from your Gmail account.
+
+Keep mail credentials in the server environment only, never in the client or source control. The bridge secret must never be shared publicly. SMTP and HTTPS requests have bounded timeouts. If email delivery fails, registration returns an explicit error and no account is created.
 
 ## Production Deployment
 
 The frontend is configured for Netlify in the workspace-root `netlify.toml`. The Express API must be deployed separately; `render.yaml` defines a Render web service, and `server/.node-version` selects the supported Node.js runtime.
 
 1. Push this workspace to a Git repository and connect that repository to Render. Create the API service from the repository's `render.yaml`.
-2. In Render, enter the real Firestore project ID, service-account email, and private key; your administrator email; and either SMTP credentials or `BREVO_API_KEY` with a verified `SMTP_FROM` sender. Add Razorpay **test** keys only if you want to test checkout. Keep real credentials in the provider's secret settings, not in source control. Do not set `FIRESTORE_EMULATOR_HOST` in production. Render generates `JWT_SECRET` from the blueprint.
+2. In Render, enter the real Firestore project ID, service-account email, and private key; your administrator email; and, for free Gmail delivery, the Google Apps Script `/exec` URL and its shared secret. Add Razorpay **test** keys only if you want to test checkout. Keep real credentials in the provider's secret settings, not in source control. Do not set `FIRESTORE_EMULATOR_HOST` in production. Render generates `JWT_SECRET` from the blueprint.
 3. Initialize the production Firestore catalog and provision the administrator using the production Firebase credentials. Do not run `seed:local` or seed demo accounts into a public database. Create real categories, services, and provider profiles before opening the marketplace to customers.
 4. After Render reports the API is healthy, copy its HTTPS service URL. In Netlify, connect the same Git repository and set the build environment variable `VITE_API_BASE_URL` to that URL, without a trailing slash. The Netlify build uses the `client` base directory and publishes `dist`.
 5. Deploy the Netlify site, then sign in with the separately provisioned administrator account and complete production catalog/provider setup. Test registration OTP delivery, sign-in, booking, and Razorpay Test Mode before announcing the site.
