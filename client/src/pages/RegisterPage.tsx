@@ -246,7 +246,7 @@ export const RegisterPage: React.FC = () => {
         ) : (
           <>
             <p className="auth-description">
-              Enter the same 6-digit code sent to <strong>{email.trim()}</strong> and your mobile number to finish creating your account.
+              Enter the 6-digit code sent to <strong>{email.trim()}</strong> to finish creating your account.
             </p>
             <div className="auth-field">
               <label htmlFor="register-otp">Verification code</label>

@@ -47,11 +47,11 @@ Run it from the `server` directory while Firestore is available. It accepts exac
 
 Run the Vite client in a second terminal with `cd client` followed by `npm run dev`. Its `/api` requests are proxied to the server on port 5000. Public registration supports customer and professional roles only; registration and sign-in stop with an explicit error if Firestore is unavailable rather than silently creating local-only accounts.
 
-## Email and SMS Verification for Registration
+## Email Verification for Registration
 
-Customer and professional registration sends the same 6-digit code to the provided email address and mobile number. The account and provider profile are created only after the code is verified. Codes expire after 10 minutes, are limited to 5 verification attempts, and can be resent once per minute.
+Customer and professional registration sends a 6-digit code to the provided email address. The mobile number is saved as contact information but is not used for verification. The account and provider profile are created only after the code is verified. Codes expire after 10 minutes, are limited to 5 verification attempts, and can be resent once per minute.
 
-Configure SMTP and Twilio on the server in `server/.env` before registering:
+Configure SMTP on the server in `server/.env` before registering:
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -60,24 +60,18 @@ SMTP_SECURE=false
 SMTP_USER=your-sender@gmail.com
 SMTP_PASS=your-mail-provider-app-password
 SMTP_FROM=Digital Vistara <your-sender@gmail.com>
-
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_FROM_NUMBER=+15017122661
-# Or use a Messaging Service instead of TWILIO_FROM_NUMBER:
-# TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Use an SMTP credential or app password from your mail provider, not your normal mailbox password. For Gmail, create an App Password after enabling 2-Step Verification. Get the Twilio Account SID, Auth Token, and sender number or Messaging Service SID from your Twilio console. Phone numbers should use international E.164 format (for example, `+919829000000`); 10-digit Indian mobile numbers are automatically prefixed with `+91`. Twilio trial accounts may only send to verified recipient numbers, and SMS availability and sender requirements vary by destination country.
+Use an SMTP credential or app password from your mail provider, not your normal mailbox password. For Gmail, create an App Password after enabling 2-Step Verification.
 
-Keep all mail and Twilio credentials in the server environment only, never in the client or source control, and restart the API after changing them. Both delivery channels must be configured and successfully send the code; otherwise registration returns an explicit error and no account is created.
+Keep mail credentials in the server environment only, never in the client or source control, and restart the API after changing them. If email delivery fails, registration returns an explicit error and no account is created.
 
 ## Production Deployment
 
 The frontend is configured for Netlify in the workspace-root `netlify.toml`. The Express API must be deployed separately; `render.yaml` defines a Render web service, and `server/.node-version` selects the supported Node.js runtime.
 
 1. Push this workspace to a Git repository and connect that repository to Render. Create the API service from the repository's `render.yaml`.
-2. In Render, enter the real Firestore project ID, service-account email, and private key; your administrator email; SMTP credentials; Twilio credentials; and Razorpay **test** keys if you want to test checkout. Keep real credentials in the provider's secret settings, not in source control. Do not set `FIRESTORE_EMULATOR_HOST` in production. Render generates `JWT_SECRET` from the blueprint.
+2. In Render, enter the real Firestore project ID, service-account email, and private key; your administrator email; SMTP credentials; and Razorpay **test** keys if you want to test checkout. Keep real credentials in the provider's secret settings, not in source control. Do not set `FIRESTORE_EMULATOR_HOST` in production. Render generates `JWT_SECRET` from the blueprint.
 3. Initialize the production Firestore catalog and provision the administrator using the production Firebase credentials. Do not run `seed:local` or seed demo accounts into a public database. Create real categories, services, and provider profiles before opening the marketplace to customers.
 4. After Render reports the API is healthy, copy its HTTPS service URL. In Netlify, connect the same Git repository and set the build environment variable `VITE_API_BASE_URL` to that URL, without a trailing slash. The Netlify build uses the `client` base directory and publishes `dist`.
 5. Deploy the Netlify site, then sign in with the separately provisioned administrator account and complete production catalog/provider setup. Test registration OTP delivery, sign-in, booking, and Razorpay Test Mode before announcing the site.

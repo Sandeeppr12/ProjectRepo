@@ -24,8 +24,7 @@
     "nodemailer": "^10.1.1",
     "razorpay": "^2.9.8",
     "socket.io": "^4.7.5",
-    "tsx": "^4.23.15",
-    "twilio": "^6.2.0"
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "firebase-tools": "^15.32.1"

@@ -7,7 +7,6 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
-const twilio = require('twilio');
 require('dotenv').config();
 const { db, isFirebaseConfigured } = require('./firebase');
 
@@ -50,7 +49,6 @@ const PAYMENT_CATALOG = {
 };
 const pendingPaymentOrders = new Map();
 let registrationMailTransport;
-let registrationSmsClient;
 
 const getRazorpayClient = () => new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -96,37 +94,11 @@ const getRegistrationMailTransport = () => {
   return registrationMailTransport;
 };
 
-const getRegistrationSmsClient = () => {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_FROM_NUMBER;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  if (!accountSid || !authToken || (!fromNumber && !messagingServiceSid)) return null;
-  if (!registrationSmsClient) registrationSmsClient = twilio(accountSid, authToken);
-  return {
-    client: registrationSmsClient,
-    fromNumber,
-    messagingServiceSid
-  };
-};
-
-const toSmsNumber = (mobile) => {
+const isValidMobileNumber = (mobile) => {
   const compact = mobile.replace(/[\s().-]/g, '');
-  if (/^\+[1-9]\d{7,14}$/.test(compact)) return compact;
-  if (/^\d{10}$/.test(compact)) return `+91${compact}`;
-  if (/^91\d{10}$/.test(compact)) return `+${compact}`;
-  return null;
-};
-
-const sendRegistrationSms = async (sms, to, body) => {
-  const message = {
-    to,
-    body,
-    ...(sms.messagingServiceSid
-      ? { messagingServiceSid: sms.messagingServiceSid }
-      : { from: sms.fromNumber })
-  };
-  return sms.client.messages.create(message);
+  return /^\+[1-9]\d{7,14}$/.test(compact)
+    || /^\d{10}$/.test(compact)
+    || /^91\d{10}$/.test(compact);
 };
 
 const registrationOtpHash = (email, otp) => crypto
@@ -208,8 +180,7 @@ const validateRegistrationInput = (body) => {
       || typeof body?.city !== 'string' || !body.city.trim()) {
     return null;
   }
-  const smsNumber = toSmsNumber(body.mobile.trim());
-  if (!smsNumber) return null;
+  if (!isValidMobileNumber(body.mobile.trim())) return null;
 
   return {
     name: body.name.trim(),
@@ -218,7 +189,6 @@ const validateRegistrationInput = (body) => {
     role,
     city: body.city.trim(),
     mobile: body.mobile.trim(),
-    smsNumber,
     category: typeof body.category === 'string' ? body.category : ''
   };
 };
@@ -226,10 +196,9 @@ const validateRegistrationInput = (body) => {
 app.post('/api/auth/register/request-otp', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Firebase is not configured on the server.' });
   const mailTransport = getRegistrationMailTransport();
-  const sms = getRegistrationSmsClient();
-  if (!mailTransport || !sms) {
+  if (!mailTransport) {
     return res.status(503).json({
-      error: 'Email and SMS verification are not fully configured. Contact the site administrator.'
+      error: 'Email verification is not configured on the server. Contact the site administrator.'
     });
   }
 
@@ -247,7 +216,7 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
     const existing = await db.collection('users').where('email', '==', registration.email).limit(1).get();
     if (!existing.empty) return res.status(409).json({ error: 'An account with this email already exists.' });
 
-    const { password: registrationPassword, smsNumber, ...pendingRegistration } = registration;
+    const { password: registrationPassword, ...pendingRegistration } = registration;
     const passwordHash = await bcrypt.hash(registrationPassword, 12);
     const otp = crypto.randomInt(100000, 1000000).toString();
     const otpHash = registrationOtpHash(registration.email, otp);
@@ -287,26 +256,15 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
       });
     }
 
-    const deliveryResults = await Promise.allSettled([
-      mailTransport.sendMail({
+    try {
+      await mailTransport.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: registration.email,
         subject: 'Your Digital Vistara verification code',
         text: `Hello ${registration.name},\n\nYour Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share this code with anyone.\n\nIf you did not request this code, you can ignore this email.`
-      }),
-      sendRegistrationSms(
-        sms,
-        smsNumber,
-        `Your Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share it with anyone.`
-      )
-    ]);
-    const failedDeliveries = deliveryResults
-      .map((result, index) => ({ result, channel: index === 0 ? 'email' : 'SMS' }))
-      .filter(({ result }) => result.status === 'rejected');
-    if (failedDeliveries.length) {
-      for (const { result, channel } of failedDeliveries) {
-        console.error(`Registration OTP ${channel} delivery failed:`, result.reason?.message || 'Unknown delivery error');
-      }
+      });
+    } catch (deliveryError) {
+      console.error('Registration OTP email delivery failed:', deliveryError.message || 'Unknown delivery error');
       await db.runTransaction(async (transaction) => {
         const pendingSnapshot = await transaction.get(pendingRef);
         if (pendingSnapshot.exists && pendingSnapshot.data().otpHash === otpHash) {
@@ -314,12 +272,12 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
         }
       });
       return res.status(502).json({
-        error: 'Could not deliver the verification code to both email and mobile. Check the email and SMS service settings and try again.'
+        error: 'Could not deliver the verification email. Check the email address and mail service settings and try again.'
       });
     }
 
     res.status(200).json({
-      message: `A verification code was sent to your email and mobile ending in ${smsNumber.slice(-4)}.`
+      message: 'A verification code was sent to your email.'
     });
   } catch (error) {
     console.error('Registration verification request failed:', error.message);
