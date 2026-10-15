@@ -14,6 +14,8 @@ services:
         generateValue: true
       - key: ADMIN_EMAIL
         sync: false
+      - key: FRONTEND_URL
+        value: https://digital-vistara-sandeeppr12.netlify.app
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_CLIENT_EMAIL

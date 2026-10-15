@@ -37,6 +37,9 @@ const PORT = process.env.PORT || 5000;
 const REGISTRATION_OTP_TTL_MS = 10 * 60 * 1000;
 const REGISTRATION_OTP_RESEND_MS = 60 * 1000;
 const REGISTRATION_OTP_MAX_ATTEMPTS = 5;
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+const PASSWORD_RESET_RESEND_MS = 60 * 1000;
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://digital-vistara-sandeeppr12.netlify.app').replace(/\/$/, '');
 const USE_MOCK_PAYMENTS = process.env.NODE_ENV !== 'production'
   && (!process.env.PAYMENT_MODE || process.env.PAYMENT_MODE === 'mock');
 const PAYMENT_CATALOG = {
@@ -63,12 +66,12 @@ const listCollection = async (name) => {
 };
 
 const publicUser = (user) => {
-  const { passwordHash, adminManaged, ...safeUser } = user;
+  const { passwordHash, adminManaged, sessionVersion, passwordChangedAt, ...safeUser } = user;
   return safeUser;
 };
 
 const signUserToken = (user) => jwt.sign(
-  { sub: user.id, role: user.role, email: user.email },
+  { sub: user.id, role: user.role, email: user.email, sessionVersion: user.sessionVersion || 0 },
   JWT_SECRET,
   { expiresIn: '7d' }
 );
@@ -108,10 +111,7 @@ const isGmailBridgeUrl = (value) => {
   }
 };
 
-const sendRegistrationEmail = async ({ to, name, otp, mailTransport, bridgeUrl, bridgeSecret }) => {
-  const subject = 'Your Digital Vistara verification code';
-  const text = `Hello ${name},\n\nYour Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share this code with anyone.\n\nIf you did not request this code, you can ignore this email.`;
-
+const sendEmail = async ({ to, subject, text, mailTransport, bridgeUrl, bridgeSecret }) => {
   if (bridgeUrl && bridgeSecret) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);
@@ -197,6 +197,9 @@ const requireAuth = async (req, res, next) => {
     const userSnapshot = await db.collection('users').doc(claims.sub).get();
     if (!userSnapshot.exists) return res.status(401).json({ error: 'Account not found.' });
     req.user = { ...documentData(userSnapshot), id: userSnapshot.id };
+    if ((claims.sessionVersion || 0) !== (req.user.sessionVersion || 0)) {
+      return res.status(401).json({ error: 'Your session expired. Sign in again.' });
+    }
     if (req.user.role === 'admin' && !isAuthorizedAdmin(req.user)) {
       return res.status(403).json({ error: 'This administrator account is not authorized.' });
     }
@@ -321,10 +324,10 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
     }
 
     try {
-      await sendRegistrationEmail({
+      await sendEmail({
         to: registration.email,
-        name: registration.name,
-        otp,
+        subject: 'Your Digital Vistara verification code',
+        text: `Hello ${registration.name},\n\nYour Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share this code with anyone.\n\nIf you did not request this code, you can ignore this email.`,
         mailTransport,
         bridgeUrl,
         bridgeSecret
@@ -399,6 +402,7 @@ app.post('/api/auth/register/verify-otp', async (req, res) => {
         favorites: [],
         emailVerified: true,
         createdAt: new Date().toISOString(),
+        sessionVersion: 0,
         passwordHash: pending.passwordHash
       };
       transaction.create(userRef, user);
@@ -432,6 +436,163 @@ app.post('/api/auth/register/verify-otp', async (req, res) => {
   } catch (error) {
     console.error('Registration OTP verification failed:', error.message);
     res.status(500).json({ error: 'Could not verify your email. Please try again.' });
+  }
+});
+
+app.post('/api/auth/password/request-reset', async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'Password reset is temporarily unavailable.' });
+
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'Enter a valid email address.' });
+  }
+
+  const bridgeUrl = process.env.GMAIL_BRIDGE_URL?.trim() || '';
+  const bridgeSecret = process.env.GMAIL_BRIDGE_SECRET || '';
+  if (Boolean(bridgeUrl) !== Boolean(bridgeSecret) || (bridgeUrl && !isGmailBridgeUrl(bridgeUrl))) {
+    return res.status(503).json({ error: 'Password reset email is not configured. Contact the site administrator.' });
+  }
+  const mailTransport = bridgeUrl ? null : getRegistrationMailTransport();
+  if (!bridgeUrl && !mailTransport) {
+    return res.status(503).json({ error: 'Password reset email is not configured. Contact the site administrator.' });
+  }
+
+  try {
+    const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (!userSnapshot.empty) {
+      const user = documentData(userSnapshot.docs[0]);
+      const token = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const emailHash = emailDocumentId(email);
+      const resetStateRef = db.collection('passwordResetRequests').doc(emailHash);
+      const resetTokenRef = db.collection('passwordResetTokens').doc(tokenHash);
+      const now = Date.now();
+
+      const transactionResult = await db.runTransaction(async (transaction) => {
+        const stateSnapshot = await transaction.get(resetStateRef);
+        const state = stateSnapshot.exists ? stateSnapshot.data() : null;
+        if (state?.lastSentAt && state.lastSentAt + PASSWORD_RESET_RESEND_MS > now) {
+          return { status: 'cooldown' };
+        }
+        const previousTokenRef = state?.tokenHash
+          ? db.collection('passwordResetTokens').doc(state.tokenHash)
+          : null;
+        const previousTokenSnapshot = previousTokenRef
+          ? await transaction.get(previousTokenRef)
+          : null;
+
+        if (previousTokenSnapshot?.exists) transaction.delete(previousTokenRef);
+        transaction.set(resetStateRef, { tokenHash, lastSentAt: now });
+        transaction.create(resetTokenRef, {
+          userId: user.id,
+          emailHash,
+          expiresAt: now + PASSWORD_RESET_TTL_MS
+        });
+        return { status: 'created' };
+      });
+
+      if (transactionResult.status === 'created') {
+        const resetUrl = new URL('/reset-password', FRONTEND_URL);
+        resetUrl.hash = `token=${token}`;
+        try {
+          await sendEmail({
+            to: email,
+            subject: 'Reset your Digital Vistara password',
+            text: `Hello ${user.name},\n\nUse this link to choose a new Digital Vistara password:\n${resetUrl.toString()}\n\nThis link expires in 30 minutes and can only be used once. If you did not request a password reset, you can ignore this email.`,
+            mailTransport,
+            bridgeUrl,
+            bridgeSecret
+          });
+        } catch (deliveryError) {
+          console.error('Password reset email delivery failed:', deliveryError.message || 'Unknown delivery error');
+          await db.runTransaction(async (transaction) => {
+            const [stateSnapshot, tokenSnapshot] = await Promise.all([
+              transaction.get(resetStateRef),
+              transaction.get(resetTokenRef)
+            ]);
+            if (stateSnapshot.exists && stateSnapshot.data().tokenHash === tokenHash) {
+              transaction.delete(resetStateRef);
+            }
+            if (tokenSnapshot.exists) transaction.delete(resetTokenRef);
+          });
+        }
+      }
+    }
+
+    res.json({
+      message: 'If an account exists for that email, a password reset link will be sent shortly.'
+    });
+  } catch (error) {
+    console.error('Password reset request failed:', error.message);
+    res.status(500).json({ error: 'Could not process the password reset request. Please try again.' });
+  }
+});
+
+app.post('/api/auth/password/reset', async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'Password reset is temporarily unavailable.' });
+
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  const password = req.body?.password;
+  if (!/^[a-f0-9]{64}$/i.test(token) || typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Use a valid reset link and choose a password of at least 8 characters.' });
+  }
+
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const tokenRef = db.collection('passwordResetTokens').doc(tokenHash);
+    const existingToken = await tokenRef.get();
+    if (!existingToken.exists) {
+      return res.status(400).json({ error: 'This reset link is invalid or has already been used. Request a new one.' });
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const now = Date.now();
+    const transactionResult = await db.runTransaction(async (transaction) => {
+      const tokenSnapshot = await transaction.get(tokenRef);
+      if (!tokenSnapshot.exists) return { status: 'invalid' };
+
+      const reset = tokenSnapshot.data();
+      const stateRef = db.collection('passwordResetRequests').doc(reset.emailHash);
+      const userRef = db.collection('users').doc(reset.userId);
+      const [stateSnapshot, userSnapshot] = await Promise.all([
+        transaction.get(stateRef),
+        transaction.get(userRef)
+      ]);
+      if (!stateSnapshot.exists || stateSnapshot.data().tokenHash !== tokenHash) {
+        transaction.delete(tokenRef);
+        return { status: 'invalid' };
+      }
+      if (reset.expiresAt <= now) {
+        transaction.delete(tokenRef);
+        transaction.delete(stateRef);
+        return { status: 'expired' };
+      }
+      if (!userSnapshot.exists) {
+        transaction.delete(tokenRef);
+        transaction.delete(stateRef);
+        return { status: 'invalid' };
+      }
+
+      transaction.update(userRef, {
+        passwordHash,
+        sessionVersion: (userSnapshot.data().sessionVersion || 0) + 1,
+        passwordChangedAt: new Date(now).toISOString()
+      });
+      transaction.delete(tokenRef);
+      transaction.delete(stateRef);
+      return { status: 'reset' };
+    });
+
+    if (transactionResult.status === 'expired') {
+      return res.status(400).json({ error: 'This reset link has expired. Request a new one.' });
+    }
+    if (transactionResult.status !== 'reset') {
+      return res.status(400).json({ error: 'This reset link is invalid or has already been used. Request a new one.' });
+    }
+
+    res.json({ message: 'Your password has been reset. Sign in with your new password.' });
+  } catch (error) {
+    console.error('Password reset failed:', error.message);
+    res.status(500).json({ error: 'Could not reset your password. Please try again.' });
   }
 });
 

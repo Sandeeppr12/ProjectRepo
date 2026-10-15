@@ -112,6 +112,12 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
+        {!isAdminLogin && (
+          <div className="auth-form-footer">
+            <Link to="/forgot-password">Forgot your password?</Link>
+          </div>
+        )}
+
         {error && <p className="auth-message" role="alert">{error}</p>}
         {status && <p className="auth-message" role="status">{status}</p>}
 

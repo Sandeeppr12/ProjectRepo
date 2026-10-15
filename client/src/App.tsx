@@ -19,6 +19,8 @@ import { AdminDashboard } from './pages/AdminDashboard';
 
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
 import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
@@ -30,7 +32,7 @@ import type { UserRole } from './types';
 const BackendErrorNotice: React.FC = () => {
   const { backendError, clearBackendError } = useApp();
   const { pathname } = useLocation();
-  if (!backendError || pathname === '/login' || pathname === '/register') return null;
+  if (!backendError || ['/login', '/register', '/forgot-password', '/reset-password'].includes(pathname)) return null;
 
   return (
     <div role="alert" className="mx-auto mt-4 flex w-[min(100%-2rem,72rem)] items-center justify-between gap-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -93,6 +95,8 @@ const AppShell: React.FC = () => {
               {/* Auth Routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               {/* Customer Routes */}
               <Route path="/customer/dashboard" element={<ProtectedRoute roles={['customer']}><CustomerDashboard /></ProtectedRoute>} />

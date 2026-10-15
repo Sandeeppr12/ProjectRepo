@@ -47,6 +47,8 @@ Run it from the `server` directory while Firestore is available. It accepts exac
 
 Run the Vite client in a second terminal with `cd client` followed by `npm run dev`. Its `/api` requests are proxied to the server on port 5000. Public registration supports customer and professional roles only; registration and sign-in stop with an explicit error if Firestore is unavailable rather than silently creating local-only accounts.
 
+Set `FRONTEND_URL` to the public client origin so password reset links point to the deployed site. Password reset emails use the same configured Gmail bridge or SMTP sender as registration verification.
+
 ## Email Verification for Registration
 
 Customer and professional registration sends a 6-digit code to the provided email address. The mobile number is saved as contact information but is not used for verification. The account and provider profile are created only after the code is verified. Codes expire after 10 minutes, are limited to 5 verification attempts, and can be resent once per minute.
@@ -76,6 +78,10 @@ Render Free blocks outbound SMTP ports, so Gmail SMTP cannot send from the free 
 6. After Render reports the deploy is live, submit a registration using an email inbox you can check. The verification code should arrive from your Gmail account.
 
 Keep mail credentials in the server environment only, never in the client or source control. The bridge secret must never be shared publicly. SMTP and HTTPS requests have bounded timeouts. If email delivery fails, registration returns an explicit error and no account is created.
+
+## Password reset
+
+The sign-in page links to a password-reset request form. Reset links are sent only for existing accounts, expire after 30 minutes, and can be used once. The request response is the same whether or not the email belongs to an account. The new password must be at least 8 characters; resetting it invalidates existing sign-in sessions.
 
 ## Production Deployment
 
