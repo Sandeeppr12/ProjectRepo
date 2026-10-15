@@ -369,6 +369,7 @@ export const AdminDashboard: React.FC = () => {
         category: editingProvider.category,
         servicesOffered: editingProvider.servicesOffered,
         skills: editingProvider.skills,
+        verificationStatus: editingProvider.verificationStatus,
         qualification: editingProvider.qualification,
         experienceYears: editingProvider.experienceYears,
         city: editingProvider.city,
@@ -1300,6 +1301,15 @@ export const AdminDashboard: React.FC = () => {
               </label>
               <label className="font-bold">Response Time (minutes)
                 <input type="number" min={0} max={10080} value={editingProvider.responseTimeMinutes} onChange={(event) => setProviderField('responseTimeMinutes', Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">Verification Status
+                <select value={editingProvider.verificationStatus} onChange={(event) => setProviderField('verificationStatus', event.target.value as Provider['verificationStatus'])} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal">
+                  <option value="PENDING">Pending</option>
+                  <option value="UNDER_REVIEW">Under review</option>
+                  <option value="VERIFIED">Verified / approved</option>
+                  <option value="SUSPENDED">Suspended</option>
+                  <option value="REJECTED">Removed / rejected</option>
+                </select>
               </label>
               <label className="font-bold">Location Latitude
                 <input type="number" min={-90} max={90} value={editingProvider.locationCoords?.lat ?? ''} onChange={(event) => setProviderField('locationCoords', {
