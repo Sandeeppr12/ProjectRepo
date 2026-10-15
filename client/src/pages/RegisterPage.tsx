@@ -40,6 +40,8 @@ export const RegisterPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
+    const requestController = new AbortController();
+    const requestTimeout = window.setTimeout(() => requestController.abort(), 25000);
     try {
       const result = await postJson<{ message: string }>('/api/auth/register/request-otp', {
         name: name.trim(),
@@ -49,12 +51,15 @@ export const RegisterPage: React.FC = () => {
         city,
         mobile: mobile.trim(),
         category
-      });
+      }, { signal: requestController.signal });
       setOtpSent(true);
       setStatus(result.message);
     } catch (registrationError) {
-      setError(registrationError instanceof Error ? registrationError.message : 'Could not send the verification code. Please try again.');
+      setError(registrationError instanceof DOMException && registrationError.name === 'AbortError'
+        ? 'The request timed out while sending the email. Please try again in a moment.'
+        : registrationError instanceof Error ? registrationError.message : 'Could not send the verification code. Please try again.');
     } finally {
+      window.clearTimeout(requestTimeout);
       setIsSubmitting(false);
     }
   };

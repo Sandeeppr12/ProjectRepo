@@ -21,7 +21,8 @@ export const apiRequest = async <T,>(path: string, init: RequestInit = {}): Prom
   return payload;
 };
 
-export const postJson = <T,>(path: string, body: unknown) => apiRequest<T>(path, {
+export const postJson = <T,>(path: string, body: unknown, init: RequestInit = {}) => apiRequest<T>(path, {
+  ...init,
   method: 'POST',
   body: JSON.stringify(body)
 });

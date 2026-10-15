@@ -88,10 +88,63 @@ const getRegistrationMailTransport = () => {
       secure: process.env.SMTP_SECURE
         ? process.env.SMTP_SECURE.toLowerCase() === 'true'
         : port === 465,
-      auth: { user, pass }
+      auth: { user, pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
   }
   return registrationMailTransport;
+};
+
+const getRegistrationMailSender = () => {
+  const configuredSender = process.env.SMTP_FROM || process.env.SMTP_USER || '';
+  const senderMatch = configuredSender.match(/^(.*?)\s*<([^<>]+)>$/);
+  const name = senderMatch?.[1].trim() || 'Digital Vistara';
+  const email = (senderMatch?.[2] || configuredSender).trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return null;
+  return { name, email };
+};
+
+const sendRegistrationEmail = async ({ to, name, otp, mailTransport }) => {
+  const subject = 'Your Digital Vistara verification code';
+  const text = `Hello ${name},\n\nYour Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share this code with anyone.\n\nIf you did not request this code, you can ignore this email.`;
+  const apiKey = process.env.BREVO_API_KEY;
+
+  if (!apiKey) {
+    return mailTransport.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to,
+      subject,
+      text
+    });
+  }
+
+  const sender = getRegistrationMailSender();
+  if (!sender) throw new Error('SMTP_FROM must contain a valid sender email address when using Brevo.');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: to }],
+        subject,
+        textContent: text
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Brevo email API returned HTTP ${response.status}.`);
+  } finally {
+    clearTimeout(timeout);
+  }
 };
 
 const isValidMobileNumber = (mobile) => {
@@ -195,10 +248,15 @@ const validateRegistrationInput = (body) => {
 
 app.post('/api/auth/register/request-otp', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Firebase is not configured on the server.' });
-  const mailTransport = getRegistrationMailTransport();
-  if (!mailTransport) {
+  const mailTransport = process.env.BREVO_API_KEY ? null : getRegistrationMailTransport();
+  if (!process.env.BREVO_API_KEY && !mailTransport) {
     return res.status(503).json({
       error: 'Email verification is not configured on the server. Contact the site administrator.'
+    });
+  }
+  if (process.env.BREVO_API_KEY && !getRegistrationMailSender()) {
+    return res.status(503).json({
+      error: 'Email verification sender is not configured correctly. Contact the site administrator.'
     });
   }
 
@@ -257,11 +315,11 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
     }
 
     try {
-      await mailTransport.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      await sendRegistrationEmail({
         to: registration.email,
-        subject: 'Your Digital Vistara verification code',
-        text: `Hello ${registration.name},\n\nYour Digital Vistara verification code is ${otp}. It expires in 10 minutes. Do not share this code with anyone.\n\nIf you did not request this code, you can ignore this email.`
+        name: registration.name,
+        otp,
+        mailTransport
       });
     } catch (deliveryError) {
       console.error('Registration OTP email delivery failed:', deliveryError.message || 'Unknown delivery error');
@@ -272,7 +330,9 @@ app.post('/api/auth/register/request-otp', async (req, res) => {
         }
       });
       return res.status(502).json({
-        error: 'Could not deliver the verification email. Check the email address and mail service settings and try again.'
+        error: process.env.BREVO_API_KEY
+          ? 'The email provider could not deliver the verification code. Check the sender configuration and try again.'
+          : 'The email server did not respond in time. Configure an HTTPS email API for this host or contact support.'
       });
     }
 
