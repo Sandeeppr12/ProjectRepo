@@ -188,6 +188,24 @@ const createProviderProfile = (user, category) => ({
   portfolio: []
 });
 
+const listAllAdminProviders = async () => {
+  const [providers, users] = await Promise.all([
+    listCollection('providers'),
+    listCollection('users')
+  ]);
+  const providersByUserId = new Map(providers.map((provider) => [provider.userId, provider]));
+  const missingProfiles = users.filter((user) => user.role === 'provider' && !providersByUserId.has(user.id));
+
+  const recoveredProfiles = await Promise.all(missingProfiles.map(async (user) => {
+    const profile = createProviderProfile(user, user.category);
+    const ref = db.collection('providers').doc(profile.id);
+    await ref.set(profile, { merge: true });
+    return profile;
+  }));
+
+  return [...providers, ...recoveredProfiles];
+};
+
 const requireAuth = async (req, res, next) => {
   const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!token) return res.status(401).json({ error: 'Sign in to continue.' });
@@ -642,13 +660,23 @@ app.get('/api/catalog', async (req, res) => {
   }
 });
 
+app.get('/api/admin/providers', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    res.json({ providers: await listAllAdminProviders() });
+  } catch (error) {
+    console.error('Admin provider list load failed:', error.message);
+    res.status(500).json({ error: 'Could not load all professional profiles.' });
+  }
+});
+
 app.get('/api/app-data', requireAuth, async (req, res) => {
   try {
-    const [allBookings, allComplaints, allNotifications, allMessages, reviews, providers, platformSettings] = await Promise.all([
+    const [allBookings, allComplaints, allNotifications, allMessages, reviews, platformSettings] = await Promise.all([
       listCollection('bookings'), listCollection('complaints'), listCollection('notifications'),
-      listCollection('messages'), listCollection('reviews'), listCollection('providers'),
+      listCollection('messages'), listCollection('reviews'),
       db.collection('settings').doc('platform').get()
     ]);
+    const providers = req.user.role === 'admin' ? await listAllAdminProviders() : await listCollection('providers');
     const provider = providers.find((item) => item.userId === req.user.id);
     const bookings = req.user.role === 'admin'
       ? allBookings
@@ -1211,15 +1239,103 @@ app.patch('/api/providers/:id', requireAuth, async (req, res) => {
     const allowedFields = [
       'name', 'mobile', 'avatar', 'category', 'servicesOffered', 'skills', 'qualification',
       'experienceYears', 'city', 'serviceArea', 'maxRadiusKm', 'hourlyRate', 'startingPrice',
-      'bio', 'availabilityDays', 'availableToday', 'responseTimeMinutes', 'portfolio'
+      'bio', 'availabilityDays', 'availableToday', 'responseTimeMinutes', 'portfolio',
+      'email', 'verificationDocs', 'locationCoords'
     ];
-    const updates = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
+    const requestedUpdates = Object.entries(req.body);
+    if (requestedUpdates.some(([key]) => !allowedFields.includes(key)
+        && !(key === 'verificationStatus' && req.user.role === 'admin'))) {
+      return res.status(400).json({ error: 'The profile contains fields that cannot be edited.' });
+    }
+    const updates = Object.fromEntries(requestedUpdates.filter(([key]) => allowedFields.includes(key)));
     if (req.user.role === 'admin' && ['VERIFIED', 'REJECTED', 'SUSPENDED', 'UNDER_REVIEW', 'PENDING'].includes(req.body.verificationStatus)) {
       updates.verificationStatus = req.body.verificationStatus;
     }
     if (!Object.keys(updates).length) return res.status(400).json({ error: 'No editable profile fields were provided.' });
+    const textLimits = {
+      name: 100, email: 254, mobile: 40, avatar: 2048, category: 120, qualification: 200,
+      city: 100, serviceArea: 200, bio: 2000
+    };
+    for (const [field, limit] of Object.entries(textLimits)) {
+      if (updates[field] !== undefined && (typeof updates[field] !== 'string' || updates[field].trim().length > limit)) {
+        return res.status(400).json({ error: `${field} must be text no longer than ${limit} characters.` });
+      }
+      if (typeof updates[field] === 'string') updates[field] = updates[field].trim();
+    }
+    if (updates.email) {
+      updates.email = updates.email.toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)) {
+        return res.status(400).json({ error: 'Enter a valid professional email address.' });
+      }
+    }
+    for (const field of ['experienceYears', 'maxRadiusKm', 'hourlyRate', 'startingPrice', 'responseTimeMinutes']) {
+      if (updates[field] !== undefined && (!Number.isFinite(Number(updates[field])) || Number(updates[field]) < 0)) {
+        return res.status(400).json({ error: `${field} must be a non-negative number.` });
+      }
+      if (updates[field] !== undefined) updates[field] = Number(updates[field]);
+    }
+    if (updates.experienceYears > 80 || updates.maxRadiusKm > 500 || updates.responseTimeMinutes > 10080) {
+      return res.status(400).json({ error: 'Experience, service radius, or response time is outside the allowed range.' });
+    }
+    for (const field of ['servicesOffered', 'skills', 'availabilityDays']) {
+      if (updates[field] !== undefined && (!Array.isArray(updates[field])
+          || updates[field].some((value) => typeof value !== 'string' || !value.trim())
+          || updates[field].length > (field === 'availabilityDays' ? 7 : 50))) {
+        return res.status(400).json({ error: `${field} must be a valid list of text values.` });
+      }
+      if (Array.isArray(updates[field])) updates[field] = [...new Set(updates[field].map((value) => value.trim()))];
+    }
+    if (updates.availableToday !== undefined && typeof updates.availableToday !== 'boolean') {
+      return res.status(400).json({ error: 'availableToday must be true or false.' });
+    }
+    if (updates.verificationDocs !== undefined) {
+      const docs = updates.verificationDocs;
+      if (!docs || typeof docs !== 'object' || Array.isArray(docs)
+          || ['idProof', 'certificate', 'submittedAt'].some((key) =>
+            docs[key] !== undefined && (typeof docs[key] !== 'string' || docs[key].length > 2048))) {
+        return res.status(400).json({ error: 'Verification documents contain invalid values.' });
+      }
+      updates.verificationDocs = {
+        idProof: typeof docs.idProof === 'string' ? docs.idProof.trim() : '',
+        certificate: typeof docs.certificate === 'string' ? docs.certificate.trim() : '',
+        submittedAt: typeof docs.submittedAt === 'string' ? docs.submittedAt.trim() : ''
+      };
+    }
+    if (updates.portfolio !== undefined && (!Array.isArray(updates.portfolio) || updates.portfolio.length > 30
+        || updates.portfolio.some((item) => !item || typeof item !== 'object' || Array.isArray(item)
+          || ['id', 'title', 'description', 'imageUrl'].some((key) =>
+            typeof item[key] !== 'string' || item[key].length > (key === 'description' || key === 'imageUrl' ? 2048 : 160))))) {
+      return res.status(400).json({ error: 'Portfolio entries must include valid IDs, titles, descriptions, and image URLs.' });
+    }
+    if (updates.locationCoords !== undefined && (!updates.locationCoords || typeof updates.locationCoords !== 'object'
+        || !Number.isFinite(Number(updates.locationCoords.lat)) || Math.abs(Number(updates.locationCoords.lat)) > 90
+        || !Number.isFinite(Number(updates.locationCoords.lng)) || Math.abs(Number(updates.locationCoords.lng)) > 180)) {
+      return res.status(400).json({ error: 'Location coordinates must contain a valid latitude and longitude.' });
+    }
+    if (updates.locationCoords) {
+      updates.locationCoords = {
+        lat: Number(updates.locationCoords.lat),
+        lng: Number(updates.locationCoords.lng)
+      };
+    }
+    const effectiveCategory = updates.category ?? provider.category;
+    const effectiveServices = updates.servicesOffered ?? provider.servicesOffered;
+    if (updates.category !== undefined || updates.servicesOffered !== undefined) {
+      const [categorySnapshot, serviceCatalog] = await Promise.all([
+        db.collection('categories').where('name', '==', effectiveCategory).limit(1).get(),
+        listCollection('services')
+      ]);
+      if (!categorySnapshot.empty) {
+        const categoryId = categorySnapshot.docs[0].id;
+        const categoryServices = new Set(
+          serviceCatalog.filter((service) => service.categoryId === categoryId).map((service) => service.name)
+        );
+        if (categoryServices.size && effectiveServices.some((service) => !categoryServices.has(service))) {
+          return res.status(400).json({ error: 'Assigned services must belong to the professional’s selected category.' });
+        }
+      }
+    }
     if (updates.verificationStatus === 'VERIFIED') {
-      const effectiveServices = updates.servicesOffered ?? provider.servicesOffered;
       const effectivePrice = Number(updates.startingPrice ?? provider.startingPrice);
       if (!Array.isArray(effectiveServices) || effectiveServices.length === 0
           || effectiveServices.some((service) => typeof service !== 'string' || !service.trim())
@@ -1227,9 +1343,43 @@ app.patch('/api/providers/:id', requireAuth, async (req, res) => {
         return res.status(400).json({ error: 'Assign at least one service and set a valid starting rate before approval.' });
       }
     }
-    await ref.update(updates);
+    const linkedUserFields = Object.fromEntries(
+      ['name', 'email', 'mobile', 'avatar']
+        .filter((field) => updates[field] !== undefined)
+        .map((field) => [field, updates[field]])
+    );
+    if (provider.userId && Object.keys(linkedUserFields).length) {
+      const userRef = db.collection('users').doc(provider.userId);
+      await db.runTransaction(async (transaction) => {
+        const userSnapshot = await transaction.get(userRef);
+        const currentEmail = userSnapshot.data()?.email;
+        const emailChanged = updates.email && updates.email !== currentEmail;
+        const nextEmailRef = emailChanged ? db.collection('userEmails').doc(emailDocumentId(updates.email)) : null;
+        const oldEmailRef = emailChanged && currentEmail
+          ? db.collection('userEmails').doc(emailDocumentId(currentEmail))
+          : null;
+        const nextEmailSnapshot = nextEmailRef ? await transaction.get(nextEmailRef) : null;
+        const oldEmailSnapshot = oldEmailRef ? await transaction.get(oldEmailRef) : null;
+        if (nextEmailSnapshot?.exists && nextEmailSnapshot.data()?.userId !== provider.userId) {
+          const conflict = new Error('That email address is already assigned to another account.');
+          conflict.statusCode = 409;
+          throw conflict;
+        }
+        transaction.update(ref, updates);
+        if (userSnapshot.exists) transaction.update(userRef, linkedUserFields);
+        if (emailChanged && nextEmailRef) {
+          if (oldEmailSnapshot?.exists && oldEmailSnapshot.data()?.userId === provider.userId) {
+            transaction.delete(oldEmailRef);
+          }
+          transaction.set(nextEmailRef, { email: updates.email, userId: provider.userId });
+        }
+      });
+    } else {
+      await ref.update(updates);
+    }
     res.json({ ...provider, ...updates });
   } catch (error) {
+    if (error.statusCode === 409) return res.status(409).json({ error: error.message });
     console.error('Provider update failed:', error.message);
     res.status(500).json({ error: 'Could not save this profile.' });
   }

@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { useApp } from '../context/AppContext';
 import { UserAvatar } from '../components/UserAvatar';
-import { Service, Provider, ServiceCategory, BookingStatus } from '../types';
+import { Service, Provider, ProviderPortfolioItem, ServiceCategory, BookingStatus } from '../types';
 import { apiRequest } from '../utils/api';
 
 interface AdminUserRecord {
@@ -91,7 +91,7 @@ const CATEGORY_DEMAND = [
 export const AdminDashboard: React.FC = () => {
   const { 
     providers, bookings, complaints, commissionPercentage, setCommissionPercentage, 
-    updateProviderVerification, updateProviderDetails, categories, updateCategory, addCategory, addProviderAccount,
+    refreshAdminProviders, updateProviderVerification, updateProviderDetails, categories, updateCategory, addCategory, addProviderAccount,
     services, addService, updateService, deleteService, updateComplaintStatus, updateBookingStatus 
   } = useApp();
 
@@ -103,6 +103,10 @@ export const AdminDashboard: React.FC = () => {
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState('');
   const [updatingRequestId, setUpdatingRequestId] = useState('');
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState('');
+  const [providerSaveError, setProviderSaveError] = useState('');
+  const [providerSaveLoading, setProviderSaveLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [transactionSearch, setTransactionSearch] = useState('');
 
@@ -136,6 +140,18 @@ export const AdminDashboard: React.FC = () => {
       setRequestsLoading(false);
     }
   }, []);
+
+  const loadAdminProviders = useCallback(async () => {
+    setProvidersLoading(true);
+    setProvidersError('');
+    try {
+      await refreshAdminProviders();
+    } catch (error) {
+      setProvidersError(error instanceof Error ? error.message : 'Could not load professional profiles.');
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, [refreshAdminProviders]);
 
   const updateProfessionalRequest = async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
     setUpdatingRequestId(requestId);
@@ -176,6 +192,10 @@ export const AdminDashboard: React.FC = () => {
     void loadProfessionalRequests(false);
   }, [loadProfessionalRequests]);
 
+  useEffect(() => {
+    void loadAdminProviders();
+  }, [loadAdminProviders]);
+
   const verifiedProviders = providers.filter(p => p.verificationStatus === 'VERIFIED');
   const pendingProviders = providers.filter(p => p.verificationStatus === 'PENDING' || p.verificationStatus === 'UNDER_REVIEW');
   const activeBookings = bookings.filter(b => b.status !== 'COMPLETED' && b.status !== 'CANCELLED');
@@ -202,11 +222,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Edit Provider State
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
-  const [editPvrName, setEditPvrName] = useState('');
-  const [editPvrRate, setEditPvrRate] = useState(0);
-  const [editPvrExp, setEditPvrExp] = useState(0);
-  const [editPvrCategoryId, setEditPvrCategoryId] = useState('');
-  const [editPvrServices, setEditPvrServices] = useState<string[]>([]);
+  const [editPvrPortfolio, setEditPvrPortfolio] = useState<ProviderPortfolioItem[]>([]);
 
   // Edit Category State
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
@@ -335,19 +351,49 @@ export const AdminDashboard: React.FC = () => {
     setEditingService(null);
   };
 
-  const handleSaveProviderEdit = () => {
+  const handleSaveProviderEdit = async () => {
     if (!editingProvider) return;
-    const category = categories.find((item) => item.id === editPvrCategoryId);
-    if (!category || editPvrServices.length === 0) return;
-    updateProviderDetails(editingProvider.id, {
-      name: editPvrName,
-      startingPrice: editPvrRate,
-      experienceYears: editPvrExp,
-      category: category.name,
-      servicesOffered: editPvrServices,
-      skills: editPvrServices
-    });
-    setEditingProvider(null);
+    if (!editingProvider.category.trim() || !editingProvider.name.trim() || !editingProvider.servicesOffered.length
+        || editingProvider.startingPrice <= 0) {
+      setProviderSaveError('Enter a name, category, at least one service, and a valid starting price.');
+      return;
+    }
+    setProviderSaveLoading(true);
+    setProviderSaveError('');
+    try {
+      await updateProviderDetails(editingProvider.id, {
+        name: editingProvider.name,
+        email: editingProvider.email,
+        mobile: editingProvider.mobile,
+        avatar: editingProvider.avatar,
+        category: editingProvider.category,
+        servicesOffered: editingProvider.servicesOffered,
+        skills: editingProvider.skills,
+        qualification: editingProvider.qualification,
+        experienceYears: editingProvider.experienceYears,
+        city: editingProvider.city,
+        serviceArea: editingProvider.serviceArea,
+        maxRadiusKm: editingProvider.maxRadiusKm,
+        hourlyRate: editingProvider.hourlyRate,
+        startingPrice: editingProvider.startingPrice,
+        bio: editingProvider.bio,
+        verificationDocs: editingProvider.verificationDocs,
+        availabilityDays: editingProvider.availabilityDays,
+        availableToday: editingProvider.availableToday,
+        responseTimeMinutes: editingProvider.responseTimeMinutes,
+        portfolio: editPvrPortfolio,
+        locationCoords: editingProvider.locationCoords
+      });
+      setEditingProvider(null);
+    } catch (error) {
+      setProviderSaveError(error instanceof Error ? error.message : 'Could not save the professional profile.');
+    } finally {
+      setProviderSaveLoading(false);
+    }
+  };
+
+  const setProviderField = <K extends keyof Provider,>(field: K, value: Provider[K]) => {
+    setEditingProvider((current) => current ? { ...current, [field]: value } : current);
   };
 
   const handleSaveCategoryEdit = () => {
@@ -898,7 +944,22 @@ export const AdminDashboard: React.FC = () => {
           </form>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-          <h3 className="font-bold text-slate-900 text-base">Manage & Edit Service Professionals</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">Manage & Edit Service Professionals</h3>
+              <p className="mt-1 text-xs text-slate-500">All professional accounts are listed here, including pending, suspended, and removed profiles.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadAdminProviders()}
+              disabled={providersLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${providersLoading ? 'animate-spin' : ''}`} />
+              {providersLoading ? 'Loading professionals…' : 'Refresh professionals'}
+            </button>
+          </div>
+          {providersError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{providersError}</p>}
           
           <div className="divide-y divide-slate-100 space-y-4">
             {providers.map(p => (
@@ -915,6 +976,8 @@ export const AdminDashboard: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-slate-500">{p.category} • {p.qualification} • {p.city}</div>
+                    <div className="mt-0.5 text-slate-500">{p.email} • {p.mobile}</div>
+                    <div className="mt-0.5 text-slate-500">Services: {p.servicesOffered?.length ? p.servicesOffered.join(', ') : 'Not assigned'}</div>
                     <div className="text-slate-400 mt-0.5">Rate: ₹{p.startingPrice} | Exp: {p.experienceYears} Yrs | Rating: ★ {p.rating}</div>
                   </div>
                 </div>
@@ -922,13 +985,15 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => {
-                      setEditingProvider(p);
-                      setEditPvrName(p.name);
-                      setEditPvrRate(p.startingPrice);
-                      setEditPvrExp(p.experienceYears);
-                      const category = categories.find((item) => item.name.toLowerCase() === p.category.toLowerCase());
-                      setEditPvrCategoryId(category?.id || '');
-                      setEditPvrServices(p.servicesOffered || []);
+                      setProviderSaveError('');
+                      setEditingProvider({
+                        ...p,
+                        servicesOffered: p.servicesOffered || [],
+                        skills: p.skills || [],
+                        availabilityDays: p.availabilityDays || [],
+                        portfolio: p.portfolio || []
+                      });
+                      setEditPvrPortfolio((p.portfolio || []).map((item) => ({ ...item })));
                     }}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                   >
@@ -936,7 +1001,12 @@ export const AdminDashboard: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => updateProviderVerification(p.id, p.verificationStatus === 'VERIFIED' ? 'SUSPENDED' : 'VERIFIED')}
+                    onClick={() => {
+                      const nextStatus = p.verificationStatus === 'VERIFIED' ? 'SUSPENDED' : 'VERIFIED';
+                      void updateProviderVerification(p.id, nextStatus).catch((error: unknown) => {
+                        setProvidersError(error instanceof Error ? error.message : 'Could not update professional approval.');
+                      });
+                    }}
                     disabled={p.verificationStatus !== 'VERIFIED' && (!p.servicesOffered?.length || p.startingPrice <= 0)}
                     title={p.verificationStatus !== 'VERIFIED' && (!p.servicesOffered?.length || p.startingPrice <= 0)
                       ? 'Assign at least one service and set a starting rate before approval.'
@@ -953,7 +1023,9 @@ export const AdminDashboard: React.FC = () => {
                     <button
                       onClick={() => {
                         if (window.confirm(`Remove ${p.name} from the public professional listings? The record will remain available here for review.`)) {
-                          updateProviderVerification(p.id, 'REJECTED');
+                          void updateProviderVerification(p.id, 'REJECTED').catch((error: unknown) => {
+                            setProvidersError(error instanceof Error ? error.message : 'Could not remove this professional listing.');
+                          });
                         }
                       }}
                       className="flex items-center gap-1 rounded-lg bg-rose-100 px-3 py-1.5 font-bold text-rose-800 hover:bg-rose-200"
@@ -964,7 +1036,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
-            {providers.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No saved professionals yet. Add one using the form above.</p>}
+            {!providersLoading && providers.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No professional accounts were found. New profiles and provider registrations will appear here after refresh.</p>}
           </div>
           </div>
         </div>
@@ -1168,90 +1240,184 @@ export const AdminDashboard: React.FC = () => {
 
       {/* EDIT PROVIDER MODAL */}
       {editingProvider && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md space-y-4 text-slate-900 text-xs">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-sm">Edit Professional Profile</h3>
-              <button onClick={() => setEditingProvider(null)}><X className="w-5 h-5 text-slate-400" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-3xl space-y-5 overflow-y-auto rounded-3xl bg-white p-6 text-xs text-slate-900 shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white pb-3">
+              <div>
+                <h3 className="text-base font-bold">Edit Complete Professional Profile</h3>
+                <p className="mt-1 text-slate-500">Profile/account details can be edited. Ratings and completed-job counts are calculated from platform activity.</p>
+              </div>
+              <button type="button" onClick={() => setEditingProvider(null)} aria-label="Close edit professional profile">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="font-bold">Professional Name
+                <input value={editingProvider.name} onChange={(event) => setProviderField('name', event.target.value)} maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Login / Contact Email
+                <input type="email" value={editingProvider.email} onChange={(event) => setProviderField('email', event.target.value)} maxLength={254} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Mobile
+                <input value={editingProvider.mobile} onChange={(event) => setProviderField('mobile', event.target.value)} maxLength={40} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Profile Image URL
+                <input value={editingProvider.avatar} onChange={(event) => setProviderField('avatar', event.target.value)} maxLength={2048} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Service Category
+                <select
+                  value={editingProvider.category}
+                  onChange={(event) => setEditingProvider((current) => current
+                    ? { ...current, category: event.target.value, servicesOffered: [] }
+                    : current)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal"
+                >
+                  <option value="">Select category</option>
+                  {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+                </select>
+              </label>
+              <label className="font-bold">Qualification
+                <input value={editingProvider.qualification} onChange={(event) => setProviderField('qualification', event.target.value)} maxLength={200} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Years of Experience
+                <input type="number" min={0} max={80} value={editingProvider.experienceYears} onChange={(event) => setProviderField('experienceYears', Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">City
+                <input value={editingProvider.city} onChange={(event) => setProviderField('city', event.target.value)} maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Service Area
+                <input value={editingProvider.serviceArea} onChange={(event) => setProviderField('serviceArea', event.target.value)} maxLength={200} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Maximum Service Radius (km)
+                <input type="number" min={0} max={500} value={editingProvider.maxRadiusKm} onChange={(event) => setProviderField('maxRadiusKm', Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">Starting Price (₹)
+                <input type="number" min={0} value={editingProvider.startingPrice} onChange={(event) => setProviderField('startingPrice', Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">Hourly Rate (₹)
+                <input type="number" min={0} value={editingProvider.hourlyRate} onChange={(event) => setProviderField('hourlyRate', Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">Response Time (minutes)
+                <input type="number" min={0} max={10080} value={editingProvider.responseTimeMinutes} onChange={(event) => setProviderField('responseTimeMinutes', Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">Location Latitude
+                <input type="number" min={-90} max={90} value={editingProvider.locationCoords?.lat ?? ''} onChange={(event) => setProviderField('locationCoords', {
+                  lat: Number(event.target.value),
+                  lng: editingProvider.locationCoords?.lng ?? 0
+                })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+              <label className="font-bold">Location Longitude
+                <input type="number" min={-180} max={180} value={editingProvider.locationCoords?.lng ?? ''} onChange={(event) => setProviderField('locationCoords', {
+                  lat: editingProvider.locationCoords?.lat ?? 0,
+                  lng: Number(event.target.value)
+                })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-normal" />
+              </label>
+            </div>
+
+            <fieldset>
+              <legend className="mb-2 font-bold">Services Offered</legend>
+              <div className="flex flex-wrap gap-2">
+                {services.filter((service) =>
+                  categories.find((category) => category.name === editingProvider.category)?.id === service.categoryId
+                ).map((service) => (
+                  <label key={service.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={editingProvider.servicesOffered.includes(service.name)}
+                      onChange={(event) => setProviderField('servicesOffered', event.target.checked
+                        ? [...editingProvider.servicesOffered, service.name]
+                        : editingProvider.servicesOffered.filter((name) => name !== service.name))}
+                      className="accent-blue-600"
+                    />
+                    {service.name}
+                  </label>
+                ))}
+                {!services.some((service) => categories.find((category) => category.name === editingProvider.category)?.id === service.categoryId)
+                  && <p className="text-amber-700">No catalog services exist for this category. Add a service before approving this professional.</p>}
+              </div>
+            </fieldset>
+
+            <label className="block font-bold">Skills (comma-separated)
+              <input value={editingProvider.skills.join(', ')} onChange={(event) => setProviderField('skills', event.target.value.split(',').map((skill) => skill.trim()).filter(Boolean))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+            </label>
+            <label className="block font-bold">Professional Bio
+              <textarea rows={4} value={editingProvider.bio} onChange={(event) => setProviderField('bio', event.target.value)} maxLength={2000} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+            </label>
+
+            <div className="space-y-2">
+              <h4 className="font-bold">Availability</h4>
+              <div className="flex flex-wrap gap-2">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                  <label key={day} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={editingProvider.availabilityDays.includes(day)}
+                      onChange={(event) => setProviderField('availabilityDays', event.target.checked
+                        ? [...editingProvider.availabilityDays, day]
+                        : editingProvider.availabilityDays.filter((value) => value !== day))}
+                    />
+                    {day}
+                  </label>
+                ))}
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                  <input type="checkbox" checked={editingProvider.availableToday} onChange={(event) => setProviderField('availableToday', event.target.checked)} />
+                  Available today
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="font-bold">ID Proof URL
+                <input value={editingProvider.verificationDocs?.idProof || ''} onChange={(event) => setProviderField('verificationDocs', { ...editingProvider.verificationDocs, idProof: event.target.value })} maxLength={2048} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold">Certificate URL
+                <input value={editingProvider.verificationDocs?.certificate || ''} onChange={(event) => setProviderField('verificationDocs', { ...editingProvider.verificationDocs, certificate: event.target.value })} maxLength={2048} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
+              <label className="font-bold sm:col-span-2">Verification Documents Submitted
+                <input type="datetime-local" value={editingProvider.verificationDocs?.submittedAt || ''} onChange={(event) => setProviderField('verificationDocs', { ...editingProvider.verificationDocs, submittedAt: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-normal" />
+              </label>
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label className="font-bold block mb-1">Professional Name</label>
-                <input
-                  type="text"
-                  value={editPvrName}
-                  onChange={(e) => setEditPvrName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold block mb-1">Service Category</label>
-                <select
-                  value={editPvrCategoryId}
-                  onChange={(event) => {
-                    setEditPvrCategoryId(event.target.value);
-                    setEditPvrServices([]);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold">Portfolio</h4>
+                <button
+                  type="button"
+                  onClick={() => setEditPvrPortfolio((current) => [...current, {
+                    id: crypto.randomUUID(),
+                    title: '',
+                    description: '',
+                    imageUrl: ''
+                  }])}
+                  className="rounded-lg bg-slate-100 px-3 py-2 font-bold hover:bg-slate-200"
                 >
-                  <option value="">Select category</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                </select>
+                  <Plus className="mr-1 inline h-3.5 w-3.5" /> Add item
+                </button>
               </div>
-
-              <fieldset>
-                <legend className="font-bold block mb-1">Services Offered</legend>
-                <div className="flex flex-wrap gap-2">
-                  {services.filter((service) => service.categoryId === editPvrCategoryId).map((service) => (
-                    <label key={service.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={editPvrServices.includes(service.name)}
-                        onChange={(event) => setEditPvrServices((current) => event.target.checked
-                          ? [...current, service.name]
-                          : current.filter((name) => name !== service.name))}
-                        className="accent-blue-600"
-                      />
-                      {service.name}
-                    </label>
-                  ))}
-                  {!editPvrCategoryId && <p className="text-slate-500">Select a category to choose services.</p>}
-                  {editPvrCategoryId && !services.some((service) => service.categoryId === editPvrCategoryId) && (
-                    <p className="text-amber-700">Add a service to this category before assigning the professional.</p>
-                  )}
+              {editPvrPortfolio.map((item, index) => (
+                <div key={item.id} className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2">
+                  <input aria-label={`Portfolio item ${index + 1} title`} value={item.title} onChange={(event) => setEditPvrPortfolio((current) => current.map((entry) => entry.id === item.id ? { ...entry, title: event.target.value } : entry))} placeholder="Project title" maxLength={160} className="rounded-lg border border-slate-200 bg-slate-50 p-2" />
+                  <input aria-label={`Portfolio item ${index + 1} image URL`} value={item.imageUrl} onChange={(event) => setEditPvrPortfolio((current) => current.map((entry) => entry.id === item.id ? { ...entry, imageUrl: event.target.value } : entry))} placeholder="Image URL" maxLength={2048} className="rounded-lg border border-slate-200 bg-slate-50 p-2" />
+                  <textarea aria-label={`Portfolio item ${index + 1} description`} value={item.description} onChange={(event) => setEditPvrPortfolio((current) => current.map((entry) => entry.id === item.id ? { ...entry, description: event.target.value } : entry))} placeholder="Description" maxLength={2048} rows={2} className="rounded-lg border border-slate-200 bg-slate-50 p-2 sm:col-span-2" />
+                  <button type="button" onClick={() => setEditPvrPortfolio((current) => current.filter((entry) => entry.id !== item.id))} className="justify-self-start rounded-lg bg-rose-50 px-3 py-2 font-bold text-rose-700 hover:bg-rose-100">
+                    <Trash2 className="mr-1 inline h-3.5 w-3.5" /> Remove item
+                  </button>
                 </div>
-              </fieldset>
-
-              <div>
-                <label className="font-bold block mb-1">Starting Rate ₹</label>
-                <input
-                  type="number"
-                  value={editPvrRate}
-                  onChange={(e) => setEditPvrRate(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold block mb-1">Years of Experience</label>
-                <input
-                  type="number"
-                  value={editPvrExp}
-                  onChange={(e) => setEditPvrExp(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono"
-                />
-              </div>
-
-              <button
-                onClick={handleSaveProviderEdit}
-                disabled={!editPvrCategoryId || editPvrServices.length === 0 || !editPvrName.trim() || editPvrRate <= 0}
-                className="w-full bg-blue-600 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-1"
-              >
-                <Save className="w-4 h-4" /> Save Provider Changes
-              </button>
+              ))}
             </div>
+
+            <p className="rounded-xl bg-slate-50 p-3 text-slate-500">
+              Ratings, review counts, completed jobs, profile ID, and account ID are platform-managed and cannot be manually changed.
+            </p>
+            {providerSaveError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{providerSaveError}</p>}
+            <button
+              onClick={() => void handleSaveProviderEdit()}
+              disabled={providerSaveLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" /> {providerSaveLoading ? 'Saving profile…' : 'Save All Profile Changes'}
+            </button>
           </div>
         </div>
       )}

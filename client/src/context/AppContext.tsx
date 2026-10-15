@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   User, Provider, ServiceCategory, Service, Booking, Review, Complaint, 
   SystemNotification, Message, BookingStatus, ComplaintStatus 
@@ -46,8 +46,9 @@ interface AppContextType {
   raiseComplaint: (complaintData: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => void;
   updateComplaintStatus: (complaintId: string, status: ComplaintStatus, adminNotes?: string) => void;
   sendMessage: (bookingId: string, text: string, imageUrl?: string) => void;
-  updateProviderVerification: (providerId: string, status: 'VERIFIED' | 'REJECTED' | 'SUSPENDED') => void;
-  updateProviderDetails: (providerId: string, updated: Partial<Provider>) => void;
+  refreshAdminProviders: () => Promise<Provider[]>;
+  updateProviderVerification: (providerId: string, status: 'VERIFIED' | 'REJECTED' | 'SUSPENDED') => Promise<void>;
+  updateProviderDetails: (providerId: string, updated: Partial<Provider>) => Promise<void>;
   addProviderAccount: (input: {
     name: string;
     email: string;
@@ -326,14 +327,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     void persist('/api/messages', 'POST', { bookingId, text, imageUrl });
   };
 
-  const updateProviderVerification = (providerId: string, status: 'VERIFIED' | 'REJECTED' | 'SUSPENDED') => {
-    setProviders(prev => prev.map(p => p.id === providerId ? { ...p, verificationStatus: status } : p));
-    void persist(`/api/providers/${providerId}`, 'PATCH', { verificationStatus: status });
+  const refreshAdminProviders = useCallback(async () => {
+    const result = await apiRequest<{ providers: Provider[] }>('/api/admin/providers');
+    setProviders(result.providers);
+    return result.providers;
+  }, []);
+
+  const updateProviderVerification = async (providerId: string, status: 'VERIFIED' | 'REJECTED' | 'SUSPENDED') => {
+    const updated = await apiRequest<Provider>(`/api/providers/${providerId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ verificationStatus: status })
+    });
+    setProviders((current) => current.map((provider) => provider.id === providerId ? updated : provider));
   };
 
-  const updateProviderDetails = (providerId: string, updated: Partial<Provider>) => {
-    setProviders(prev => prev.map(p => p.id === providerId ? { ...p, ...updated } : p));
-    void persist(`/api/providers/${providerId}`, 'PATCH', updated);
+  const updateProviderDetails = async (providerId: string, updated: Partial<Provider>) => {
+    const saved = await apiRequest<Provider>(`/api/providers/${providerId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updated)
+    });
+    setProviders((current) => current.map((provider) => provider.id === providerId ? saved : provider));
   };
 
   const addProviderAccount = async (input: Parameters<AppContextType['addProviderAccount']>[0]) => {
@@ -434,6 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       raiseComplaint,
       updateComplaintStatus,
       sendMessage,
+      refreshAdminProviders,
       updateProviderVerification,
       updateProviderDetails,
       addProviderAccount,
