@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AuthPageLayout } from '../components/AuthPageLayout';
 import { postJson } from '../utils/api';
 
 export const ResetPasswordPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const isAdminReset = searchParams.get('role') === 'admin';
   const [token, setToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -56,7 +58,7 @@ export const ResetPasswordPage: React.FC = () => {
         : 'Create a new password for your Digital Vistara account.'}
       footer={(
         <div className="auth-form-footer">
-          <Link to="/login">Return to sign in</Link>
+          <Link to={isAdminReset ? '/login?role=admin' : '/login'}>Return to sign in</Link>
         </div>
       )}
     >

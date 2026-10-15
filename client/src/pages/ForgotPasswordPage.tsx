@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AuthPageLayout } from '../components/AuthPageLayout';
 import { useApp } from '../context/AppContext';
 import { postJson } from '../utils/api';
 
 export const ForgotPasswordPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const { isFirebaseConnected } = useApp();
+  const isAdminReset = searchParams.get('role') === 'admin';
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -42,7 +44,7 @@ export const ForgotPasswordPage: React.FC = () => {
       description="Enter the email address associated with your account. If it matches, we’ll send you a secure reset link."
       footer={(
         <div className="auth-form-footer">
-          Remembered your password? <Link to="/login">Sign in</Link>
+          Remembered your password? <Link to={isAdminReset ? '/login?role=admin' : '/login'}>Sign in</Link>
         </div>
       )}
     >

@@ -493,6 +493,7 @@ app.post('/api/auth/password/request-reset', async (req, res) => {
 
       if (transactionResult.status === 'created') {
         const resetUrl = new URL('/reset-password', FRONTEND_URL);
+        if (user.role === 'admin') resetUrl.searchParams.set('role', 'admin');
         resetUrl.hash = `token=${token}`;
         try {
           await sendEmail({
