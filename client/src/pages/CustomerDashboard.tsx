@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   LayoutDashboard, Calendar, Clock, CheckCircle2, Heart, 
-  MapPin, MessageSquare, AlertCircle, ArrowRight, User as UserIcon 
+  MapPin, MessageSquare, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/UserAvatar';
 
 export const CustomerDashboard: React.FC = () => {
   const { currentUser, bookings, favorites, providers, complaints } = useApp();
@@ -28,7 +29,7 @@ export const CustomerDashboard: React.FC = () => {
       {/* Welcome Banner */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center space-x-4">
-          <img src={currentUser?.avatar} alt={currentUser?.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-blue-500" />
+          <UserAvatar src={currentUser?.avatar} name={currentUser?.name} className="w-16 h-16 rounded-2xl border-2 border-blue-500" />
           <div>
             <div className="flex items-center space-x-2">
               <h1 className="text-2xl font-extrabold text-white">Welcome back, {currentUser?.name}!</h1>
@@ -115,7 +116,7 @@ export const CustomerDashboard: React.FC = () => {
             {filteredBookings.map((b) => (
               <div key={b.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start space-x-4">
-                  <img src={b.providerAvatar} alt={b.providerName} className="w-14 h-14 rounded-xl object-cover" />
+                  <UserAvatar src={b.providerAvatar} name={b.providerName} className="w-14 h-14 rounded-xl" />
                   <div>
                     <div className="flex items-center space-x-2">
                       <span className="font-extrabold text-slate-900 text-base">{b.serviceName}</span>
@@ -151,7 +152,7 @@ export const CustomerDashboard: React.FC = () => {
           {favProviders.map(p => (
             <div key={p.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <img src={p.avatar} alt={p.name} className="w-12 h-12 rounded-xl object-cover" />
+                <UserAvatar src={p.avatar} name={p.name} className="w-12 h-12 rounded-xl" />
                 <div>
                   <div className="font-bold text-slate-900 text-sm">{p.name}</div>
                   <div className="text-xs text-slate-500">{p.category} • ★ {p.rating}</div>

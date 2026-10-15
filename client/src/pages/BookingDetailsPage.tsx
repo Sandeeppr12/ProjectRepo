@@ -5,6 +5,7 @@ import {
   Send, AlertTriangle, Star, Check, ArrowRight, User, X 
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/UserAvatar';
 import { BookingStatus } from '../types';
 
 const STATUS_STEPS: BookingStatus[] = [
@@ -136,7 +137,7 @@ export const BookingDetailsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="flex items-center space-x-3">
-                <img src={booking.providerAvatar} alt={booking.providerName} className="w-12 h-12 rounded-xl object-cover" />
+                <UserAvatar src={booking.providerAvatar} name={booking.providerName} className="w-12 h-12 rounded-xl" />
                 <div>
                   <div className="font-bold text-slate-900 text-sm">{booking.providerName}</div>
                   <div className="text-slate-500">{booking.providerCategory}</div>

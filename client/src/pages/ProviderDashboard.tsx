@@ -5,6 +5,7 @@ import {
   Briefcase, Star, MessageSquare, ArrowRight, Upload, Plus 
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/UserAvatar';
 
 export const ProviderDashboard: React.FC = () => {
   const { currentUser, providers, bookings, updateBookingStatus, reviews } = useApp();
@@ -24,7 +25,7 @@ export const ProviderDashboard: React.FC = () => {
       {/* Header Profile Banner */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center space-x-4">
-          <img src={provider.avatar} alt={provider.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500" />
+          <UserAvatar src={provider.avatar} name={provider.name} className="w-16 h-16 rounded-2xl border-2 border-emerald-500" />
           <div>
             <div className="flex items-center space-x-2">
               <h1 className="text-2xl font-extrabold text-white">{provider.name}</h1>

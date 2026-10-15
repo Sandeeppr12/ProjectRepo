@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Provider, AIRecommendationReason } from '../types';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from './UserAvatar';
 
 interface ProviderCardProps {
   provider: Provider;
@@ -25,11 +26,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, recommenda
         <div className="flex items-start justify-between">
           <div className="flex space-x-3.5">
             <div className="relative">
-              <img 
-                src={provider.avatar} 
-                alt={provider.name}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100 shadow" 
-              />
+              <UserAvatar src={provider.avatar} name={provider.name} className="w-16 h-16 rounded-2xl border-2 border-slate-100 shadow" />
               {provider.availableToday && (
                 <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full title='Available Today'"></span>
               )}

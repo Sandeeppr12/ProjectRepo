@@ -5,6 +5,7 @@ import {
   PieChart, Pie, Cell 
 } from 'recharts';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/UserAvatar';
 import { Service, Provider, ServiceCategory, BookingStatus } from '../types';
 import { apiRequest } from '../utils/api';
 
@@ -762,7 +763,7 @@ export const AdminDashboard: React.FC = () => {
             {providers.map(p => (
               <div key={p.id} className="pt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs">
                 <div className="flex items-center space-x-3">
-                  <img src={p.avatar} alt={p.name} className="w-12 h-12 rounded-xl object-cover" />
+                  <UserAvatar src={p.avatar} name={p.name} className="w-12 h-12 rounded-xl" />
                   <div>
                     <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
                       <span>{p.name}</span>

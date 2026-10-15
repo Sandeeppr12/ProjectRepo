@@ -22,7 +22,7 @@
 .home-proof-line { display: flex; align-items: center; gap: 10px; margin-top: 23px; color: #72756c; font-size: 11px; }
 .home-proof-line strong { color: var(--ink); font-weight: 700; }
 .home-proof-avatars { display: flex; padding-left: 4px; }
-.home-proof-avatars img { width: 28px; height: 28px; margin-left: -4px; border: 2px solid #f1f0e8; border-radius: 50%; object-fit: cover; }
+.home-proof-avatars .home-proof-avatar { width: 28px; height: 28px; margin-left: -4px; border: 2px solid #f1f0e8; border-radius: 50%; }
 .home-proof-divider { height: 21px; margin-inline: 4px; border-left: 1px solid #d4d3c8; }
 .home-rating { display: inline-flex; align-items: center; gap: 4px; color: #9c6b29; font-weight: 700; }
 .home-rating svg { width: 13px; height: 13px; }

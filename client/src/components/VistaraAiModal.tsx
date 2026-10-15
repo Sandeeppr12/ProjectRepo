@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Send, X, Bot, User as UserIcon, ArrowRight, CheckCircle2, Shield } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from './UserAvatar';
 import { parseNaturalLanguageQuery } from '../utils/nlpParser';
 import { rankProvidersWithAI } from '../utils/aiRecommendationEngine';
 
@@ -156,7 +157,7 @@ export const VistaraAiModal: React.FC = () => {
                         className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 hover:border-blue-500 cursor-pointer flex items-center justify-between transition group"
                       >
                         <div className="flex items-center space-x-2.5">
-                          <img src={p.avatar} alt={p.name} className="w-8 h-8 rounded-full object-cover" />
+                          <UserAvatar src={p.avatar} name={p.name} className="w-8 h-8 rounded-full" />
                           <div>
                             <div className="font-semibold text-white text-xs flex items-center space-x-1">
                               <span>{p.name}</span>

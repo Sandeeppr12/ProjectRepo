@@ -5,6 +5,7 @@ import {
   MessageSquare, ShieldCheck, Award, Image as ImageIcon, Heart, ArrowRight, BookOpen
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/UserAvatar';
 
 export const ProviderProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -26,11 +27,7 @@ export const ProviderProfilePage: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start space-x-5">
             <div className="relative">
-              <img 
-                src={provider.avatar} 
-                alt={provider.name} 
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-slate-100 shadow-md"
-              />
+              <UserAvatar src={provider.avatar} name={provider.name} className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 border-slate-100 shadow-md" />
               {provider.availableToday && (
                 <span className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full"></span>
               )}

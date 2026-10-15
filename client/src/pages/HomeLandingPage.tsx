@@ -5,6 +5,7 @@ import {
   PartyPopper, Search, ShieldCheck, Star, Wrench, type LucideIcon
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/UserAvatar';
 import { ProviderCard } from '../components/ProviderCard';
 import { rankProvidersWithAI } from '../utils/aiRecommendationEngine';
 import { INDIAN_CITIES } from '../data/mockData';
@@ -76,7 +77,7 @@ export const HomePage: React.FC = () => {
 
             <div className="home-proof-line">
               <div className="home-proof-avatars" aria-hidden="true">
-                {providers.slice(0, 3).map((provider) => <img key={provider.id} src={provider.avatar} alt="" />)}
+                {providers.slice(0, 3).map((provider) => <UserAvatar key={provider.id} src={provider.avatar} name={provider.name} className="home-proof-avatar" />)}
               </div>
               <span><strong>{providers.length} local professionals</strong> ready to lend a hand</span>
               <span className="home-proof-divider" />
