@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
+@import "tailwindcss";
+
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #272b25;
+  background: #f8f7f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --ink: #272b25;
+  --muted: #74776e;
+  --paper: #f8f7f2;
+  --white: #fffefa;
+  --line: #e6e4db;
+  --green: #315b45;
+  --green-dark: #244735;
+  --orange: #c96b43;
+  --serif: 'DM Serif Display', Georgia, serif;
+}
+
+body {
+  @apply antialiased min-h-screen;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-user-select: auto;
+}
+
+::selection { background: #dbe6d8; color: var(--ink); }
+button, input, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+a { color: inherit; }
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: var(--paper); }
+::-webkit-scrollbar-thumb { background: #c7c9bd; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #939b8b; }
+
+.glass-card { background: rgba(255, 254, 250, .9); backdrop-filter: blur(14px); border: 1px solid var(--line); }
+.gradient-text { color: var(--orange); }
+.badge-verified { background: var(--green); color: white; }
+.btn-dv-primary, .btn-dv-teal { background: var(--green); color: white; font-weight: 700; border-radius: 7px; padding: .625rem 1.5rem; transition: background .2s, transform .15s; }
+.btn-dv-primary:hover, .btn-dv-teal:hover { background: var(--green-dark); transform: translateY(-1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media (max-width: 640px) {
+  body:has(.booking-payment-actions) .site-whatsapp-button { display: none; }
+}
+

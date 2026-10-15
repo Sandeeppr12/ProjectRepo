@@ -1,0 +1,33 @@
+{
+  "name": "digital-vistara-server",
+  "version": "1.0.0",
+  "description": "Backend API Server for Digital Vistara Service Marketplace",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "dev:local": "node --watch dev-local.js",
+    "emulator": "node start-firestore-emulator.js",
+    "seed": "tsx seed.js",
+    "seed:local": "tsx seed-local.js",
+    "admin:create": "node provision-admin.js",
+    "admin:create:local": "node provision-admin-local.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^13.10.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^10.1.1",
+    "razorpay": "^2.9.8",
+    "socket.io": "^4.7.5",
+    "tsx": "^4.23.15",
+    "twilio": "^6.2.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.32.1"
+  }
+}

@@ -1,0 +1,323 @@
+.velvet-app {
+  --velvet-bg: #120e12;
+  --velvet-bg-soft: #191319;
+  --velvet-panel: #211a20;
+  --velvet-panel-light: #2a2028;
+  --velvet-line: rgba(238, 221, 226, .1);
+  --velvet-text: #f2e9e9;
+  --velvet-muted: #a79aa2;
+  --velvet-quiet: #746a71;
+  --velvet-pink: #e9a3ad;
+  --velvet-rose: #d88191;
+  --velvet-serif: 'DM Serif Display', Georgia, serif;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--velvet-bg);
+  color: var(--velvet-text);
+  font-family: 'DM Sans', sans-serif;
+}
+
+.velvet-app button, .velvet-app input, .velvet-app select { font: inherit; }
+.velvet-app button { color: inherit; }
+.velvet-app a { color: inherit; text-decoration: none; }
+.velvet-app button:focus-visible, .velvet-app a:focus-visible, .velvet-app input:focus-visible, .velvet-app select:focus-visible { outline: 2px solid var(--velvet-pink); outline-offset: 3px; }
+.velvet-nav { position: relative; z-index: 2; display: flex; height: 76px; align-items: center; justify-content: space-between; padding: 0 max(6.5vw, 32px); border-bottom: 1px solid rgba(238, 221, 226, .07); background: rgba(18, 14, 18, .94); }
+.velvet-brand { display: inline-flex; align-items: center; gap: 9px; font-family: var(--velvet-serif); font-size: 25px; letter-spacing: -.5px; }
+.velvet-brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgba(233, 163, 173, .35); border-radius: 50%; color: var(--velvet-pink); }
+.velvet-brand-mark svg { width: 14px; height: 14px; }
+.velvet-brand-dot { color: var(--velvet-pink); }
+.velvet-nav-links { display: flex; height: 100%; align-items: center; gap: 37px; }
+.velvet-nav-links a, .velvet-nav-links button { position: relative; padding: 8px 0; border: 0; background: none; color: var(--velvet-muted); font-size: 12px; cursor: pointer; }
+.velvet-nav-links a:hover, .velvet-nav-links button:hover, .velvet-nav-links .is-current { color: var(--velvet-text); }
+.velvet-nav-links .is-current::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--velvet-pink); content: ''; }
+.velvet-nav-actions { display: flex; align-items: center; gap: 19px; }
+.velvet-private { display: flex; align-items: center; gap: 7px; color: var(--velvet-muted); font-size: 10px; }
+.velvet-private svg { color: var(--velvet-pink); }
+.velvet-avatar-button { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(233, 163, 173, .35); border-radius: 50%; background: #33232e; color: #f4c7ce; font-size: 12px; cursor: pointer; }
+
+.velvet-hero { position: relative; min-height: 572px; padding: 73px max(10vw, 54px) 0; overflow: hidden; background: radial-gradient(ellipse at 81% 50%, rgba(112, 53, 75, .22), transparent 42%), linear-gradient(113deg, #191318 0%, #191318 55%, #21151c 100%); }
+.velvet-hero::before { position: absolute; inset: 0; background-image: linear-gradient(rgba(240, 220, 226, .025) 1px, transparent 1px), linear-gradient(90deg, rgba(240, 220, 226, .025) 1px, transparent 1px); background-size: 72px 72px; mask-image: linear-gradient(90deg, transparent, black 80%); content: ''; pointer-events: none; }
+.velvet-hero-glow { position: absolute; top: 90px; right: 11%; width: 450px; height: 380px; border-radius: 50%; background: rgba(152, 79, 105, .12); filter: blur(100px); }
+.velvet-hero-inner { position: relative; z-index: 1; display: grid; width: min(1110px, 100%); min-height: 454px; grid-template-columns: 1.05fr .95fr; align-items: center; gap: 56px; margin: 0 auto; }
+.velvet-hero-copy { padding-bottom: 28px; }
+.velvet-eyebrow { display: flex; align-items: center; gap: 11px; margin: 0 0 18px; color: var(--velvet-pink); font-size: 9px; font-weight: 700; letter-spacing: 1.7px; }
+.velvet-eyebrow-line { width: 23px; height: 1px; background: var(--velvet-pink); }
+.velvet-hero h1, .velvet-section-heading h2, .velvet-how-heading h2, .velvet-bottom-cta h2, .velvet-boundary-panel h2, .velvet-age-card h2 { margin: 0; font-family: var(--velvet-serif); font-size: clamp(43px, 5vw, 65px); font-weight: 400; line-height: 1.1; letter-spacing: -.7px; }
+.velvet-hero h1 em, .velvet-section-heading h2 em, .velvet-how-heading h2 em, .velvet-bottom-cta h2 em, .velvet-boundary-panel h2 em, .velvet-age-card h2 em { color: var(--velvet-pink); font-weight: 400; }
+.velvet-hero-description { max-width: 436px; margin: 20px 0 23px; color: #b8adb3; font-size: 13px; line-height: 1.8; }
+.velvet-hero-actions { display: flex; align-items: center; gap: 22px; }
+.velvet-button { display: inline-flex; min-height: 45px; align-items: center; justify-content: center; gap: 13px; padding: 0 17px; border: 0; border-radius: 3px; font-size: 11px; font-weight: 700; cursor: pointer; transition: transform .2s, background .2s; }
+.velvet-button:hover { transform: translateY(-2px); }
+.velvet-button-primary { background: #db8d9b; color: #24171d !important; }
+.velvet-button-primary:hover { background: #efadb6; }
+.velvet-online { display: flex; align-items: center; gap: 8px; color: var(--velvet-muted); font-size: 10px; }
+.velvet-online > span, .velvet-card-status i, .velvet-chat-person small i, .velvet-fiction-label > span { width: 6px; height: 6px; border-radius: 50%; background: #82bba0; box-shadow: 0 0 9px rgba(130, 187, 160, .45); }
+.velvet-hero-note { display: flex; align-items: center; gap: 8px; margin-top: 25px; color: #897d85; font-size: 10px; }
+.velvet-hero-note svg { color: #d794a0; }
+.velvet-hero-art { position: relative; height: 408px; }
+.velvet-orbit { position: absolute; top: 50%; left: 50%; border: 1px solid rgba(238, 205, 218, .1); border-radius: 50%; transform: translate(-50%, -50%) rotate(-21deg); }
+.velvet-orbit-one { width: 402px; height: 315px; }
+.velvet-orbit-two { width: 340px; height: 398px; transform: translate(-50%, -50%) rotate(27deg); }
+.velvet-art-card { position: absolute; overflow: hidden; border: 1px solid rgba(246, 221, 230, .3); border-radius: 3px; background: var(--velvet-panel); box-shadow: 0 24px 55px rgba(0, 0, 0, .4); }
+.velvet-art-main { top: 24px; right: 73px; width: 240px; height: 310px; transform: rotate(3deg); }
+.velvet-art-main > img { width: 100%; height: 100%; object-fit: cover; object-position: center 35%; filter: saturate(.8); }
+.velvet-art-main::after { position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, rgba(25, 17, 23, .75)); content: ''; }
+.velvet-art-caption { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: space-between; padding: 15px; color: #f5e8e9; font-size: 10px; }
+.velvet-art-caption > span { display: flex; align-items: center; gap: 7px; }
+.velvet-art-caption i { width: 6px; height: 6px; border-radius: 50%; background: #a0c7ae; }
+.velvet-art-caption svg { color: #f1bdc5; }
+.velvet-art-small { top: 173px; left: 5px; width: 125px; height: 158px; transform: rotate(-8deg); }
+.velvet-art-small img { width: 100%; height: 100%; object-fit: cover; object-position: center 38%; }
+.velvet-note-card { position: absolute; right: -2px; bottom: 18px; display: flex; align-items: center; gap: 9px; padding: 11px 13px; border: 1px solid rgba(238, 218, 225, .14); background: rgba(35, 25, 32, .94); color: #d8cbd1; font-family: var(--velvet-serif); font-size: 11px; line-height: 1.35; transform: rotate(-3deg); }
+.velvet-note-heart { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: rgba(218, 139, 155, .16); color: #e8a3ae; }
+.velvet-art-sparkle { position: absolute; color: #ecadb7; }
+.sparkle-one { top: 14px; left: 95px; font-size: 21px; }
+.sparkle-two { top: 91px; right: 10px; font-size: 18px; }
+.velvet-hero-foot { position: relative; display: flex; width: min(1110px, 100%); justify-content: space-between; margin: 0 auto; padding: 18px 0; border-top: 1px solid rgba(238, 221, 226, .1); color: #756b72; font-size: 8px; font-weight: 700; letter-spacing: 1.3px; }
+.velvet-hero-foot span:last-child { display: flex; align-items: center; gap: 8px; }
+
+.velvet-trust-strip { display: flex; min-height: 109px; align-items: center; justify-content: center; gap: 47px; border-bottom: 1px solid rgba(238, 221, 226, .08); background: #171217; }
+.velvet-trust-strip > div { display: flex; align-items: center; gap: 12px; }
+.velvet-trust-strip > div > svg { width: 19px; height: 19px; color: #dc98a4; stroke-width: 1.5; }
+.velvet-trust-strip > div span { display: grid; gap: 4px; }
+.velvet-trust-strip strong { color: #ded3d8; font-size: 10px; font-weight: 600; }
+.velvet-trust-strip small { color: #837781; font-size: 9px; }
+.velvet-trust-strip > i { height: 30px; border-left: 1px solid rgba(238, 221, 226, .11); }
+
+.velvet-discover { width: min(1110px, calc(100% - 64px)); margin: 0 auto; padding: 80px 0 86px; }
+.velvet-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 30px; }
+.velvet-section-heading .velvet-eyebrow, .velvet-how-heading .velvet-eyebrow { margin-bottom: 13px; }
+.velvet-section-heading h2, .velvet-how-heading h2 { font-size: 39px; }
+.velvet-section-heading > div:first-child > p:last-child { margin: 10px 0 0; color: var(--velvet-muted); font-size: 11px; }
+.velvet-search { display: flex; width: 268px; min-height: 39px; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid var(--velvet-line); border-radius: 3px; color: #9b8d96; }
+.velvet-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--velvet-text); font-size: 10px; }
+.velvet-search input::placeholder { color: #81757e; }
+.velvet-filter-row { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 19px; padding-bottom: 13px; border-bottom: 1px solid var(--velvet-line); }
+.velvet-filters { display: flex; align-items: center; gap: 8px; }
+.velvet-filters button { display: flex; min-height: 29px; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid transparent; border-radius: 2px; background: transparent; color: #9c9097; font-size: 9px; cursor: pointer; }
+.velvet-filters button.is-active { border-color: rgba(226, 155, 166, .28); background: rgba(226, 155, 166, .09); color: #edb6be; }
+.velvet-fiction-label { display: flex; align-items: center; gap: 7px; color: #8b7e87; font-size: 9px; }
+.velvet-fiction-label > span { width: 5px; height: 5px; }
+.velvet-companion-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 17px; }
+.velvet-companion-card { overflow: hidden; border: 1px solid rgba(239, 220, 228, .1); border-radius: 3px; background: #1b151b; transition: transform .2s, border-color .2s; }
+.velvet-companion-card:hover { transform: translateY(-4px); border-color: rgba(232, 163, 174, .4); }
+.velvet-card-image { position: relative; display: block; width: 100%; height: 202px; padding: 0; overflow: hidden; border: 0; background: #30222a; cursor: pointer; }
+.velvet-card-image::after { position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, rgba(23, 17, 22, .5)); content: ''; }
+.velvet-card-image > img { width: 100%; height: 100%; object-fit: cover; object-position: center 38%; filter: saturate(.76); transition: transform .5s; }
+.velvet-companion-card:hover .velvet-card-image > img { transform: scale(1.04); }
+.velvet-card-status { position: absolute; z-index: 1; bottom: 11px; left: 11px; display: flex; align-items: center; gap: 7px; color: #f1e6e8; font-size: 8px; }
+.velvet-card-status i { width: 5px; height: 5px; }
+.velvet-card-heart { position: absolute; z-index: 1; top: 10px; right: 10px; display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(250, 237, 239, .27); border-radius: 50%; background: rgba(26, 19, 24, .45); color: #fff0f1; }
+.velvet-card-content { padding: 15px 14px 13px; }
+.velvet-card-title { display: flex; align-items: center; justify-content: space-between; }
+.velvet-card-title h3 { margin: 0; color: #f0e5e8; font-family: var(--velvet-serif); font-size: 19px; font-weight: 400; }
+.velvet-card-title h3 span { color: #a4969e; font-family: 'DM Sans', sans-serif; font-size: 10px; }
+.velvet-card-title p { margin: 3px 0 0; color: #c596a2; font-size: 9px; }
+.velvet-card-sparkle { color: #d8919f; }
+.velvet-card-description { min-height: 45px; margin: 13px 0 12px; color: #a99da4; font-size: 9px; line-height: 1.65; }
+.velvet-card-tags { display: flex; gap: 6px; }
+.velvet-card-tags span { padding: 5px 7px; border: 1px solid rgba(237, 219, 225, .09); border-radius: 2px; color: #a99da4; font-size: 8px; }
+.velvet-card-cta { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-top: 15px; padding: 11px 0 0; border: 0; border-top: 1px solid var(--velvet-line); background: transparent; color: #e8a6b0 !important; font-size: 9px; font-weight: 700; cursor: pointer; }
+.velvet-card-cta svg { transition: transform .2s; }
+.velvet-card-cta:hover svg { transform: translateX(3px); }
+.velvet-empty-state { display: grid; min-height: 220px; grid-column: 1 / -1; align-content: center; justify-items: center; gap: 9px; color: var(--velvet-muted); }
+.velvet-empty-state svg { margin-bottom: 5px; color: var(--velvet-pink); }
+.velvet-empty-state strong { color: var(--velvet-text); font-family: var(--velvet-serif); font-size: 19px; font-weight: 400; }
+.velvet-empty-state span { font-size: 10px; }
+
+.velvet-how { padding: 68px 32px 54px; background: #1a141a; text-align: center; }
+.velvet-how-heading .velvet-eyebrow { justify-content: center; }
+.velvet-how-heading h2 { font-size: 36px; }
+.velvet-how-heading > p:last-child { margin: 9px 0 0; color: var(--velvet-muted); font-size: 11px; }
+.velvet-how-grid { display: grid; width: min(930px, 100%); grid-template-columns: repeat(3, 1fr); margin: 41px auto 0; text-align: left; }
+.velvet-how-grid article { position: relative; min-height: 173px; padding: 0 27px; border-left: 1px solid rgba(238, 221, 226, .12); }
+.velvet-how-grid article:last-child { border-right: 1px solid rgba(238, 221, 226, .12); }
+.velvet-how-number { position: absolute; top: -3px; right: 24px; color: #64545e; font-family: var(--velvet-serif); font-size: 19px; }
+.velvet-how-icon { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(233, 163, 173, .27); border-radius: 50%; color: #e8a4ae; }
+.velvet-how-grid h3 { margin: 17px 0 7px; color: #ece2e5; font-family: var(--velvet-serif); font-size: 17px; font-weight: 400; }
+.velvet-how-grid p { max-width: 230px; margin: 0; color: #9e929a; font-size: 10px; line-height: 1.7; }
+.velvet-how-footer { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 24px; color: #8c7e87; font-size: 9px; }
+.velvet-how-footer svg { color: #d797a2; }
+
+.velvet-bottom-cta { position: relative; display: flex; min-height: 326px; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; background: radial-gradient(ellipse at 50% 115%, rgba(140, 66, 88, .31), transparent 56%), #21171e; text-align: center; }
+.velvet-bottom-glow { position: absolute; top: 40%; left: 50%; width: 430px; height: 180px; border-radius: 50%; background: rgba(175, 88, 113, .13); filter: blur(75px); transform: translateX(-50%); }
+.velvet-cta-icon { position: relative; display: grid; width: 34px; height: 34px; place-items: center; margin-bottom: 12px; border: 1px solid rgba(233, 163, 173, .38); border-radius: 50%; color: var(--velvet-pink); }
+.velvet-bottom-cta .velvet-eyebrow { position: relative; margin-bottom: 10px; font-size: 8px; }
+.velvet-bottom-cta h2 { position: relative; margin-bottom: 17px; font-size: 39px; }
+.velvet-button-light { position: relative; background: #f0dcdf; color: #31232a !important; }
+.velvet-button-light:hover { background: white; }
+.velvet-bottom-note { position: relative; display: flex; align-items: center; gap: 6px; margin: 13px 0 0; color: #988891; font-size: 9px; }
+
+.velvet-footer { display: grid; min-height: 137px; grid-template-columns: 1fr auto; align-content: center; align-items: center; gap: 11px 20px; padding: 23px max(6.5vw, 32px); border-top: 1px solid rgba(238, 221, 226, .08); background: #120e12; }
+.velvet-footer .velvet-brand { font-size: 20px; }
+.velvet-footer .velvet-brand-mark { width: 26px; height: 26px; }
+.velvet-footer p { margin: 0; color: #857982; font-size: 9px; }
+.velvet-footer > div { display: flex; align-items: center; gap: 11px; color: #958a92; font-size: 8px; }
+.velvet-footer > div i { width: 3px; height: 3px; border-radius: 50%; background: #bd8290; }
+.velvet-footer > div button { padding: 0; border: 0; background: transparent; color: #d09aa4; font-size: 8px; cursor: pointer; }
+.velvet-footer > small { grid-column: 1 / -1; color: #665c64; font-size: 8px; }
+
+.velvet-age-overlay, .velvet-chat-overlay, .velvet-boundary-overlay { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(8, 6, 8, .78); backdrop-filter: blur(11px); }
+.velvet-age-card { width: min(440px, 100%); padding: 39px 41px 33px; border: 1px solid rgba(239, 220, 228, .15); background: #1b151a; text-align: center; box-shadow: 0 30px 90px rgba(0, 0, 0, .5); }
+.velvet-age-mark { display: grid; width: 45px; height: 45px; place-items: center; margin: 0 auto 18px; border: 1px solid rgba(233, 163, 173, .35); border-radius: 50%; color: #e8a4ae; }
+.velvet-age-mark svg { width: 20px; }
+.velvet-age-card .velvet-eyebrow { justify-content: center; margin-bottom: 11px; font-size: 8px; }
+.velvet-age-card h2 { font-size: 34px; }
+.velvet-age-card > p:not(.velvet-eyebrow) { margin: 12px 0 21px; color: #a99da4; font-size: 11px; line-height: 1.75; }
+.velvet-age-card > .velvet-button { width: 100%; }
+.velvet-age-privacy { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 14px; color: #827680; font-size: 8px; }
+.velvet-age-privacy svg { color: #d797a2; }
+
+.velvet-chat-overlay { place-items: stretch end; padding: 0; background: rgba(8, 6, 8, .7); }
+.velvet-chat-panel { display: flex; width: min(570px, 100%); height: 100%; flex-direction: column; border-left: 1px solid rgba(239, 220, 228, .13); background: #191319; box-shadow: -20px 0 70px rgba(0, 0, 0, .35); animation: velvet-slide-in .23s ease-out; }
+@keyframes velvet-slide-in { from { transform: translateX(30px); opacity: .7; } to { transform: translateX(0); opacity: 1; } }
+.velvet-chat-topbar { display: flex; min-height: 70px; align-items: center; gap: 14px; padding: 0 22px; border-bottom: 1px solid var(--velvet-line); }
+.velvet-icon-button { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: #b4a7af !important; cursor: pointer; }
+.velvet-icon-button:hover { border-color: var(--velvet-line); background: rgba(245, 224, 231, .05); color: white !important; }
+.velvet-chat-person { display: flex; flex: 1; align-items: center; gap: 10px; }
+.velvet-chat-person > img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.velvet-chat-person > span { display: grid; gap: 4px; }
+.velvet-chat-person strong { color: #f1e6e8; font-family: var(--velvet-serif); font-size: 16px; font-weight: 400; }
+.velvet-chat-person small { display: flex; align-items: center; gap: 6px; color: #91858e; font-size: 8px; }
+.velvet-chat-person small i { width: 5px; height: 5px; }
+.velvet-chat-actions { display: flex; align-items: center; gap: 3px; }
+.velvet-more-wrap { position: relative; }
+.velvet-more-menu { position: absolute; z-index: 4; top: 39px; right: 0; width: 152px; padding: 5px; border: 1px solid var(--velvet-line); background: #241b23; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); }
+.velvet-more-menu button { width: 100%; padding: 10px; border: 0; background: transparent; color: #d4c7ce; text-align: left; font-size: 9px; cursor: pointer; }
+.velvet-more-menu button:hover { background: rgba(238, 221, 226, .08); }
+.velvet-chat-context { display: flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 24px; border-bottom: 1px solid var(--velvet-line); color: #958891; font-size: 8px; }
+.velvet-chat-context svg { color: #d997a2; }
+.velvet-chat-body { flex: 1; padding: 22px 24px; overflow-y: auto; }
+.velvet-chat-date { display: flex; align-items: center; justify-content: center; gap: 10px; color: #726770; font-size: 8px; letter-spacing: 1.2px; }
+.velvet-chat-date span { width: 34px; border-top: 1px solid var(--velvet-line); }
+.velvet-chat-welcome { display: grid; justify-items: center; gap: 8px; margin: 23px 0 25px; color: #f0e4e8; text-align: center; }
+.velvet-chat-welcome-icon { display: grid; width: 33px; height: 33px; place-items: center; margin-bottom: 2px; border: 1px solid rgba(233, 163, 173, .28); border-radius: 50%; color: #e5a0aa; }
+.velvet-chat-welcome strong { font-family: var(--velvet-serif); font-size: 17px; font-weight: 400; }
+.velvet-chat-welcome > span:last-child { color: #8e828b; font-size: 9px; }
+.velvet-messages { display: grid; gap: 14px; }
+.velvet-message { display: flex; max-width: 87%; align-items: end; gap: 8px; }
+.velvet-message > img { width: 24px; height: 24px; flex: 0 0 auto; border-radius: 50%; object-fit: cover; }
+.velvet-message > div { min-width: 0; }
+.velvet-message p { margin: 0; padding: 11px 13px; border: 1px solid rgba(239, 220, 228, .08); border-radius: 2px 10px 10px 10px; background: #282028; color: #d8cdd3; font-size: 10px; line-height: 1.65; }
+.velvet-message time { display: block; margin: 5px 2px 0; color: #766b73; font-size: 7px; }
+.velvet-message-you { justify-self: end; }
+.velvet-message-you p { border-color: rgba(223, 150, 163, .14); border-radius: 10px 2px 10px 10px; background: #3a252e; color: #f0dce1; }
+.velvet-message-you time { text-align: right; }
+.velvet-starters { display: grid; justify-items: start; gap: 7px; margin: 19px 0 0 31px; }
+.velvet-starters > span { margin-bottom: 2px; color: #837681; font-size: 7px; font-weight: 700; letter-spacing: 1.2px; }
+.velvet-starters button { display: inline-flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid rgba(238, 221, 226, .11); border-radius: 2px; background: transparent; color: #baaeb5; font-size: 8px; cursor: pointer; }
+.velvet-starters button:hover { border-color: rgba(233, 163, 173, .35); color: #efb2bb; }
+.velvet-chat-compose { padding: 13px 22px 14px; border-top: 1px solid var(--velvet-line); background: #171217; }
+.velvet-tone-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.velvet-tone-row > label { color: #837781; font-size: 8px; }
+.velvet-tone-select { position: relative; display: inline-flex; align-items: center; }
+.velvet-tone-select select { padding: 4px 18px 4px 7px; appearance: none; border: 1px solid rgba(238, 221, 226, .11); border-radius: 2px; background: #211a20; color: #d8c9d0; font-size: 8px; }
+.velvet-tone-select > svg { position: absolute; right: 4px; color: #a3929c; pointer-events: none; }
+.velvet-boundary-shortcut { display: flex; align-items: center; gap: 5px; margin-left: auto; padding: 4px; border: 0; background: transparent; color: #bd99a1 !important; font-size: 8px; cursor: pointer; }
+.velvet-message-form { display: flex; min-height: 47px; align-items: center; gap: 9px; padding: 5px 6px 5px 12px; border: 1px solid rgba(238, 221, 226, .15); background: #211a20; }
+.velvet-message-form input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #f2e9e9; font-size: 10px; }
+.velvet-message-form input::placeholder { color: #827680; }
+.velvet-message-form button { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 2px; background: #dc929f; color: #24171d; cursor: pointer; }
+.velvet-message-form button:disabled { background: #3a2e36; color: #81747c; cursor: not-allowed; }
+.velvet-compose-foot { display: flex; justify-content: space-between; margin: 8px 0 0; color: #70646d; font-size: 7px; }
+.velvet-compose-foot > span:first-child { display: flex; align-items: center; gap: 4px; }
+.velvet-compose-foot svg { color: #b7828d; }
+
+.velvet-boundary-overlay { z-index: 110; }
+.velvet-boundary-panel { width: min(380px, 100%); padding: 25px; border: 1px solid rgba(239, 220, 228, .14); background: #1c161c; box-shadow: 0 28px 80px rgba(0, 0, 0, .48); }
+.velvet-boundary-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 21px; }
+.velvet-boundary-icon { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(233, 163, 173, .28); border-radius: 50%; color: #e6a0aa; }
+.velvet-boundary-panel .velvet-eyebrow { margin-bottom: 9px; font-size: 8px; }
+.velvet-boundary-panel h2 { font-size: 31px; }
+.velvet-boundary-intro { margin: 10px 0 18px; color: #a3969e; font-size: 10px; line-height: 1.7; }
+.velvet-boundary-option { display: flex; width: 100%; min-height: 43px; align-items: center; justify-content: space-between; padding: 0 11px; border: 1px solid rgba(238, 221, 226, .09); border-bottom: 0; background: #211a20; color: #bfb1b9 !important; font-size: 9px; text-align: left; cursor: pointer; }
+.velvet-boundary-option:nth-of-type(5) { border-bottom: 1px solid rgba(238, 221, 226, .09); }
+.velvet-boundary-option.is-checked { color: #e8d9dd !important; }
+.velvet-checkbox { display: grid; width: 16px; height: 16px; place-items: center; border: 1px solid #67535e; border-radius: 2px; color: #25191f; }
+.velvet-boundary-option.is-checked .velvet-checkbox { border-color: #dc929f; background: #dc929f; }
+.velvet-boundary-assurance { display: flex; align-items: center; gap: 6px; margin: 15px 0; color: #81757e; font-size: 8px; }
+.velvet-boundary-assurance svg { color: #d797a2; }
+.velvet-boundary-done { width: 100%; }
+.velvet-help-button { position: fixed; z-index: 10; right: 19px; bottom: 18px; display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(238, 221, 226, .15); border-radius: 50%; background: rgba(28, 21, 28, .92); color: #bb9aa3; cursor: pointer; }
+.velvet-help-button:hover { border-color: rgba(233, 163, 173, .45); color: #e8a4ae; }
+
+@media (max-width: 950px) {
+  .velvet-hero { padding-right: 6vw; padding-left: 6vw; }
+  .velvet-hero-inner { gap: 20px; }
+  .velvet-hero-art { transform: scale(.88); transform-origin: center right; }
+  .velvet-companion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .velvet-card-image { height: 240px; }
+  .velvet-trust-strip { gap: 23px; }
+}
+@media (max-width: 680px) {
+  .velvet-nav { height: 64px; padding: 0 20px; }
+  .velvet-nav-links { position: absolute; top: 64px; right: 0; left: 0; height: 38px; justify-content: center; gap: 27px; border-bottom: 1px solid rgba(238, 221, 226, .07); background: #151015; }
+  .velvet-nav-links a, .velvet-nav-links button { font-size: 10px; }
+  .velvet-nav-actions { gap: 11px; }
+  .velvet-private { font-size: 0; }
+  .velvet-private svg { width: 15px; height: 15px; }
+  .velvet-avatar-button { width: 30px; height: 30px; }
+  .velvet-hero { padding: 134px 23px 0; }
+  .velvet-hero-inner { min-height: auto; grid-template-columns: 1fr; gap: 0; }
+  .velvet-hero-copy { padding: 0 0 0; }
+  .velvet-hero h1 { font-size: clamp(43px, 12vw, 57px); }
+  .velvet-hero-description { max-width: 420px; font-size: 12px; }
+  .velvet-hero-actions { flex-wrap: wrap; gap: 14px; }
+  .velvet-hero-note { align-items: flex-start; margin-top: 17px; font-size: 9px; }
+  .velvet-hero-art { width: min(100%, 380px); height: 337px; margin: 11px auto -6px; transform: scale(.88); transform-origin: center top; }
+  .velvet-art-main { right: 49px; width: 218px; height: 276px; }
+  .velvet-art-small { top: 152px; }
+  .velvet-note-card { right: -1px; bottom: 12px; }
+  .velvet-orbit-one { width: 340px; height: 280px; }
+  .velvet-orbit-two { width: 290px; height: 345px; }
+  .velvet-hero-foot { font-size: 7px; letter-spacing: .8px; }
+  .velvet-trust-strip { display: grid; grid-template-columns: 1fr; gap: 16px; justify-content: stretch; padding: 20px 28px; }
+  .velvet-trust-strip > i { display: none; }
+  .velvet-trust-strip > div > svg { width: 17px; height: 17px; }
+  .velvet-trust-strip strong { font-size: 9px; }
+  .velvet-discover { width: calc(100% - 40px); padding: 57px 0 62px; }
+  .velvet-section-heading { align-items: flex-start; flex-direction: column; gap: 17px; }
+  .velvet-section-heading h2, .velvet-how-heading h2 { font-size: 32px; }
+  .velvet-search { width: 100%; }
+  .velvet-filter-row { align-items: flex-start; flex-direction: column; gap: 12px; margin-top: 21px; }
+  .velvet-filters { max-width: 100%; gap: 3px; }
+  .velvet-filters button { padding: 0 8px; font-size: 8px; }
+  .velvet-companion-grid { gap: 10px; }
+  .velvet-card-image { height: 185px; }
+  .velvet-card-content { padding: 12px 10px 11px; }
+  .velvet-card-title h3 { font-size: 17px; }
+  .velvet-card-title h3 span { font-size: 9px; }
+  .velvet-card-title p { max-width: 130px; font-size: 8px; }
+  .velvet-card-description { min-height: 58px; font-size: 8px; }
+  .velvet-card-tags { flex-wrap: wrap; gap: 4px; }
+  .velvet-card-tags span { padding: 4px 5px; font-size: 7px; }
+  .velvet-how { padding: 54px 22px 38px; }
+  .velvet-how-grid { grid-template-columns: 1fr; gap: 22px; margin-top: 29px; }
+  .velvet-how-grid article { min-height: 120px; padding: 0 17px; border-right: 0 !important; }
+  .velvet-how-grid h3 { margin-top: 10px; }
+  .velvet-how-footer { align-items: flex-start; font-size: 8px; line-height: 1.5; }
+  .velvet-bottom-cta { min-height: 300px; padding: 28px 15px; }
+  .velvet-bottom-cta h2 { font-size: 34px; }
+  .velvet-footer { grid-template-columns: 1fr; justify-items: center; gap: 10px; padding: 23px 17px; text-align: center; }
+  .velvet-footer > div { flex-wrap: wrap; justify-content: center; }
+  .velvet-footer > small { grid-column: auto; }
+  .velvet-age-card { padding: 32px 23px 25px; }
+  .velvet-chat-topbar { min-height: 62px; padding: 0 12px; }
+  .velvet-chat-context { padding: 0 15px; font-size: 7px; }
+  .velvet-chat-body { padding: 17px 15px; }
+  .velvet-chat-compose { padding: 12px 12px 13px; }
+  .velvet-compose-foot { font-size: 6px; }
+}
+@media (max-width: 390px) {
+  .velvet-brand { font-size: 22px; }
+  .velvet-nav-links { gap: 19px; }
+  .velvet-hero { padding-right: 17px; padding-left: 17px; }
+  .velvet-companion-grid { grid-template-columns: 1fr; gap: 13px; }
+  .velvet-card-image { height: 240px; }
+  .velvet-card-description { min-height: auto; }
+  .velvet-card-content { padding: 14px; }
+  .velvet-filters button { padding: 0 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .velvet-app *, .velvet-app *::before, .velvet-app *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
